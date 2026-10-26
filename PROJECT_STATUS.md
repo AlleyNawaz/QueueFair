@@ -15,3 +15,11 @@
 - No database schema, queue rules, authentication logic, dependencies, or API features changed.
 - Layout review complete: 375px/768px/1440px layouts and 1920px wall display checked; no horizontal overflow across student, staff, admin, display and login. Refreshed screenshots inspected. Helper contrast and 44px primary targets improved. Nine existing browser tests, lint, strict typecheck, formatting, and production build pass.
 - Previous implementation commits were pushed to origin/main at the user’s explicit request. Redesign verified locally; no additional remote push performed for this UI task.
+
+## Vercel build fix — 2026-10-26
+
+- User supplied failed Vercel logs: generated Prisma client missing from `src/server/db.ts` import. The client is intentionally Git-ignored, while the old build script did not generate it.
+- Build now runs `prisma generate && next build`; `vercel.json` enforces that build script and the Next.js framework even when dashboard overrides exist. CI removes the generated client before its final build to catch this regression.
+- Verification: isolated Git-archive checkout, no generated client, no .env files, fresh frozen install, and an unreachable placeholder DATABASE_URL. Build exited 0 and generated the client automatically without contacting a live database. An offline install first failed due to unavailable registry metadata; the normal online frozen install passed. Lint, typecheck and formatting passed.
+- Added docs/VERCEL.md covering hosted PostgreSQL, canonical HTTPS APP_ORIGIN, SESSION_SECRET, explicit migrations and demo seed. Builds never reset or seed a database.
+- GitHub reported two linked failed Vercel projects: queuefair and queue-fair. No Vercel connector/CLI is connected; Firefox computer access was not approved. Actual cloud environment/migrations/deployment remain unverified until the user provides project details or cloud access.

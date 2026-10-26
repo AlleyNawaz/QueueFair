@@ -39,6 +39,10 @@ createdb -h 127.0.0.1 -p 55432 -U queuefair queuefair_demo
 
 Set the URL port to `55432` and use the password supplied to `initdb`. The current development session uses an isolated local instance on port 55432; Docker was not installed in the implementation environment.
 
+## Deploy to Vercel
+
+Follow the [Vercel setup guide](docs/VERCEL.md) for hosted PostgreSQL, environment variables, migrations and seeding. Use `pnpm build`: it generates the Prisma client before compiling Next.js, including on cached builds. Your local database URL cannot be used from Vercel.
+
 ## Demo accounts and routes
 
 | Purpose                  | Route / account                                             |
