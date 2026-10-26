@@ -2,27 +2,27 @@
 
 Executed locally on 2026-10-26 with Node 26.12.0, pnpm 11.25.0 and PostgreSQL 16.15 on macOS. All results below describe actual commands. CI was authored but has not run remotely.
 
-| Check                                     | Actual result                                                                                                                 |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm install --frozen-lockfile`          | PASS; lockfile installs without changes                                                                                       |
-| `pnpm peers check`                        | PASS; no peer dependency issues                                                                                               |
-| Prisma schema validate / client generate  | PASS; Prisma 7.10.1                                                                                                           |
-| `pnpm db:migrate`, `pnpm db:migrate:test` | PASS; committed migration applied to separate demo/test databases                                                             |
-| `pnpm db:seed`                            | PASS; three services, five counters, synthetic history and environment-provided account passwords                             |
-| `pnpm db:rollover`                        | PASS; explicit command executes without startup reset                                                                         |
-| `pnpm test`                               | PASS; 60 deterministic domain tests                                                                                           |
-| `pnpm test:integration`                   | PASS; 13 PostgreSQL integration/concurrency tests                                                                             |
-| `pnpm test:e2e`                           | PASS; 9 Chromium browser tests, separate guarded `_test` database                                                             |
-| `pnpm lint`                               | PASS; no warnings/errors                                                                                                      |
-| `pnpm typecheck`                          | PASS; strict TypeScript                                                                                                       |
-| `pnpm format:check`                       | PASS                                                                                                                          |
-| `pnpm build`                              | PASS; optimized Next.js 16.4.3 production build                                                                               |
-| `pnpm start --port 3002`                  | PASS; production server started locally                                                                                       |
-| Production Chromium smoke                 | PASS; student join/ownership/cancel, staff login/workspace/logout, admin login/analytics and public display; zero page errors |
-| Responsive visual checks                  | PASS; actual 375px and 1440px screenshots; 1920px wall display; mobile service and wall display had no horizontal overflow    |
-| Docker Compose execution                  | NOT RUN; Docker is not installed in this environment                                                                          |
-| Remote CI / public deploy / GitHub push   | NOT RUN; no publishing performed                                                                                              |
-| Recorded fallback video                   | NOT CREATED; recording instructions are in DEMO.md                                                                            |
+| Check                                     | Actual result                                                                                                                                                                                               |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm install --frozen-lockfile`          | PASS; lockfile installs without changes                                                                                                                                                                     |
+| `pnpm peers check`                        | PASS; no peer dependency issues                                                                                                                                                                             |
+| Prisma schema validate / client generate  | PASS; Prisma 7.10.1                                                                                                                                                                                         |
+| `pnpm db:migrate`, `pnpm db:migrate:test` | PASS; committed migration applied to separate demo/test databases                                                                                                                                           |
+| `pnpm db:seed`                            | PASS; three services, five counters, synthetic history and environment-provided account passwords                                                                                                           |
+| `pnpm db:rollover`                        | PASS; explicit command executes without startup reset                                                                                                                                                       |
+| `pnpm test`                               | PASS; 60 deterministic domain tests                                                                                                                                                                         |
+| `pnpm test:integration`                   | PASS; 13 PostgreSQL integration/concurrency tests                                                                                                                                                           |
+| `pnpm test:e2e`                           | PASS; 9 Chromium browser tests, separate guarded `_test` database                                                                                                                                           |
+| `pnpm lint`                               | PASS; no warnings/errors                                                                                                                                                                                    |
+| `pnpm typecheck`                          | PASS; strict TypeScript                                                                                                                                                                                     |
+| `pnpm format:check`                       | PASS                                                                                                                                                                                                        |
+| `pnpm build`                              | PASS; optimized Next.js 16.4.3 production build                                                                                                                                                             |
+| `pnpm start --port 3002`                  | PASS; production server started locally                                                                                                                                                                     |
+| Production Chromium smoke                 | PASS; student join/ownership/cancel, staff login/workspace/logout, admin login/analytics and public display; zero page errors                                                                               |
+| Responsive visual checks                  | PASS; actual 375px and 1440px screenshots; 768px browser checks across directory, service, display, login and instructions; 1920px wall display; mobile service and wall display had no horizontal overflow |
+| Docker Compose execution                  | NOT RUN; Docker is not installed in this environment                                                                                                                                                        |
+| Remote CI / public deploy / GitHub push   | NOT RUN; no publishing performed                                                                                                                                                                            |
+| Recorded fallback video                   | NOT CREATED; recording instructions are in DEMO.md                                                                                                                                                          |
 
 ## Coverage
 
@@ -40,6 +40,8 @@ Browser tests cover a student-owned join surviving refresh; separate staff calls
 - First browser run could not launch because Chromium was not installed. Downloaded the matching Playwright browser and reran successfully.
 - ESLint initially picked up `.next-e2e` generated files. Generated output is now consistently ignored by lint, formatting and Git.
 - Hooks lint caught render-time ref effects and clocks. Sound runs in an effect and operator elapsed time uses the server’s polled sync timestamp.
+
+- Final review corrected administrator date presets to use Asia/Karachi dates around midnight. Lint, typecheck, all 60 domain tests, all nine browser tests, and production build passed again afterward.
 
 ## Artifacts
 

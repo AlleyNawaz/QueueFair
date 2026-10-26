@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { localDate } from "@/lib/policy";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type { z } from "zod";
@@ -43,7 +44,7 @@ const defaultSettings: Settings = {
 export function AdminOverview() {
   const q = useLive<PublicService[]>("services", 5000);
   const stats = useLive<Analytics>(
-    `admin/analytics?from=${new Date().toISOString().slice(0, 10)}T00:00:00%2B05:00`,
+    `admin/analytics?from=${q.data?.[0]?.localDate ?? localDate(new Date())}T00:00:00%2B05:00`,
     15000,
   );
   return (
@@ -433,10 +434,10 @@ function ServiceForm({ initial, id }: { initial: Settings; id?: string }) {
 }
 export function AnalyticsView() {
   const [from, setFrom] = useState(() =>
-    new Date(Date.now() - 6 * 86400_000).toISOString().slice(0, 10),
+    localDate(new Date(Date.now() - 6 * 86400_000)),
   );
   const [to, setTo] = useState(() =>
-    new Date(Date.now() + 86400_000).toISOString().slice(0, 10),
+    localDate(new Date(Date.now() + 86400_000)),
   );
   const path = `admin/analytics?from=${from}T00:00:00%2B05:00&to=${to}T00:00:00%2B05:00`;
   const q = useLive<Analytics>(path, 15000);
