@@ -48,3 +48,15 @@ Browser tests cover a student-owned join surviving refresh; separate staff calls
 Actual production-browser screenshots are committed under `docs/screenshots`: directory desktop/mobile, private ticket desktop/mobile, staff workspace, token-only public display, and aggregate analytics. The captured student ticket was cancelled after capture, leaving no stray waiting participation. Credentials/cookie values were not included in captures or logs.
 
 Remaining scope: long-form Urdu translations, push notifications, CSV export and advanced administration (account provisioning/assignment removal) are not implemented. The prototype uses browser identity, heuristic estimates, polling and local/global abuse limits as documented. No manual security audit, real campus validation, real-world impact, Kiro usage or production deployment is claimed.
+
+## Visual redesign verification — 2026-10-26
+
+The user requested a more contemporary visual design, using Stripe and Airbnb as references. The UI now uses ink/indigo styling, new service-card compositions, navigation states, a real-data campus summary, and coordinated student/operator/admin/display surfaces. No queue rules, schema, API, authentication behavior, or dependencies changed.
+
+- `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, and `pnpm build`: passed.
+- Existing Playwright suite: all nine browser scenarios passed with the redesign.
+- Actual browser review: directory, service, display and login at 375px, 768px, and 1440px; staff/admin at 375px and 768px; wall display at 1920px. No horizontal page overflow.
+- Existing student join/ticket/cancel and staff/admin sign-in were exercised while refreshing screenshots. No browser page errors occurred. The captured ticket was cancelled afterward.
+- Primary directory buttons measured 44px tall. Focus indicators, helper contrast, reduced-motion styles and print styles were retained/refined.
+- Updated screenshots were captured from the running local development server; only the development tooling overlay was hidden for clean captures. The original production smoke record above still refers to the initial implementation. A new production build passed after the visual work.
+- Unit and database integration tests were not repeated for this UI-only change; their previously recorded passes remain above. No database or backend source files changed.

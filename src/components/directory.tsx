@@ -3,177 +3,232 @@ import Link from "next/link";
 import { dictionaries } from "@/lib/i18n/dictionaries";
 import {
   ArrowRight,
-  BookOpen,
+  ArrowUpRight,
+  Check,
   Clock3,
   GraduationCap,
   Landmark,
   Laptop,
+  MapPin,
+  Radio,
   Search,
+  ShieldCheck,
+  Ticket,
   Users,
 } from "lucide-react";
 import { useState } from "react";
 import { useLocale } from "./providers";
-import { Badge, ErrorBox, Loading, Location, Sync, useLive } from "./shared";
+import { Badge, ErrorBox, Loading, Sync, useLive } from "./shared";
 import type { PublicService } from "@/server/reads";
+
 export function Directory() {
   const q = useLive<PublicService[]>("services", 15000);
   const [search, setSearch] = useState("");
   const { ur, t } = useLocale();
   if (!q.data)
     return (
-      <>
+      <main className="page">
         <ErrorBox error={q.error} />
         <Loading />
-      </>
+      </main>
     );
   const list = q.data.filter((s) =>
     `${s.name} ${s.description}`.toLowerCase().includes(search.toLowerCase()),
   );
+  const active = q.data.reduce(
+    (n, s) => n + s.counters.filter((c) => c.state === "ACTIVE").length,
+    0,
+  );
+  const waiting = q.data.reduce((n, s) => n + s.waitingCount, 0);
   return (
-    <main className="page" dir={ur ? "rtl" : "ltr"}>
-      <div className="eyebrow">
-        <span className="status-dot" /> CEDAR CAMPUS{" "}
-        <span className="divider">/</span> STUDENT SERVICES
+    <main
+      className="page directory-page"
+      dir={ur ? "rtl" : "ltr"}
+      lang={ur ? "ur" : "en"}
+    >
+      <div className="directory-context">
+        <span>
+          <span className="campus-monogram">C</span>Cedar Campus{" "}
+          <span className="context-divider">/</span> Student services
+        </span>
+        <span className="demo-label">Fictional campus · Demo data</span>
       </div>
-      <div className="page-heading">
-        <div>
-          <h1>{t.headline}</h1>
+      <section className="directory-hero" aria-label="Campus queue overview">
+        <div className="hero-copy">
+          <span className="eyebrow">
+            <span className="status-dot" /> A BETTER WAY TO WAIT
+          </span>
+          <h1>
+            {ur ? (
+              t.headline
+            ) : (
+              <>
+                Your time.
+                <br />
+                <span>Back in your hands.</span>
+              </>
+            )}
+          </h1>
           <p>{t.intro}</p>
-        </div>
-        <div className="campus-date">
-          <Clock3 size={18} />
-          <div>
-            Campus time{" "}
-            <strong>
-              {new Date(
-                q.data[0]?.syncedAt ?? "2026-01-01T00:00:00Z",
-              ).toLocaleString("en-PK", {
-                timeZone: "Asia/Karachi",
-                weekday: "short",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </strong>
-            <small>Asia/Karachi</small>
+          <div className="hero-footnote">
+            <ShieldCheck size={16} />
+            <span>No account. No personal details. Just your turn.</span>
           </div>
         </div>
-      </div>
-      <div className="intro-strip">
-        <div className="intro-icon">
-          <TicketSymbol />
+        <div className="campus-pulse">
+          <div className="pulse-heading">
+            <span>
+              <Radio size={16} /> Campus pulse
+            </span>
+            <span className={`pulse-live ${q.error ? "is-stale" : ""}`}>
+              <span className="status-dot" />
+              {q.error ? "STALE" : "LIVE"}
+            </span>
+          </div>
+          <div className="pulse-main">
+            <div>
+              <strong>{String(waiting).padStart(2, "0")}</strong>
+              <span>people in line across campus</span>
+            </div>
+            <div className="pulse-orbit" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+              <Ticket size={24} />
+            </div>
+          </div>
+          <div className="pulse-footer">
+            <span>
+              <i />
+              {active} active counters
+            </span>
+            <span>
+              {q.data.filter((s) => s.joiningOpen).length} services open{" "}
+              <ArrowUpRight size={14} />
+            </span>
+          </div>
         </div>
+      </section>
+      <section className="directory-services" aria-labelledby="services-title">
+        <div className="directory-toolbar">
+          <div>
+            <h2 id="services-title">
+              {t.campusServices}
+              <span className="count">{q.data.length}</span>
+            </h2>
+            <p>A clear queue. A little more room in your day.</p>
+          </div>
+          <label className="search">
+            <Search size={19} />
+            <span className="sr-only">Search services</span>
+            <input
+              placeholder="Find your service…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <kbd aria-hidden="true">⌕</kbd>
+          </label>
+        </div>
+        <div className="service-grid">
+          {list.map((s, i) => (
+            <ServiceCard key={s.id} s={s} ur={ur} index={i} />
+          ))}
+        </div>
+        {!list.length && (
+          <div className="empty">
+            <Search size={26} />
+            <p>No services match your search.</p>
+          </div>
+        )}
+        <div className="directory-refresh">
+          <Sync error={q.error} at={q.data[0]?.syncedAt} />
+          <span>
+            <ShieldCheck size={14} /> Fair queue. Same rules for everyone.
+          </span>
+        </div>
+      </section>
+      <section className="how-strip" aria-label="How QueueFair works">
+        <div className="how-strip-heading">
+          <span className="eyebrow">FROM HERE TO YOUR TURN</span>
+          <h2>
+            Three steps.
+            <br /> Zero guesswork.
+          </h2>
+          <Link className="text-link" href="/how-it-works">
+            How it works <ArrowUpRight size={15} />
+          </Link>
+        </div>
+        <ol>
+          <li>
+            <span className="step-icon">
+              <Search size={21} />
+            </span>
+            <span className="step-number">01</span>
+            <h3>Find your desk</h3>
+            <p>Check the wait and what to bring.</p>
+          </li>
+          <li>
+            <span className="step-icon">
+              <Ticket size={21} />
+            </span>
+            <span className="step-number">02</span>
+            <h3>Save your place</h3>
+            <p>Get a private ticket in this browser.</p>
+          </li>
+          <li>
+            <span className="step-icon">
+              <Check size={21} />
+            </span>
+            <span className="step-number">03</span>
+            <h3>Make your move</h3>
+            <p>Head over when your counter calls.</p>
+          </li>
+        </ol>
+      </section>
+      <div className="browser-reminder">
         <div>
-          <strong>A place in line. Peace of mind.</strong>
+          <ShieldCheck size={20} />
           <p>
-            Join from your browser. Follow your ticket. Head to the counter when
-            called.
+            <strong>Your ticket stays with this browser.</strong> Keep your
+            cookies to keep self-service access.
           </p>
         </div>
-        <Link href="/how-it-works">
-          See how it works <ArrowRight size={16} />
-        </Link>
-      </div>
-      <div className="directory-layout">
-        <section>
-          <div className="section-heading">
-            <div>
-              <h2>
-                {t.campusServices}{" "}
-                <span className="count">{q.data.length}</span>
-              </h2>
-              <p>Choose the desk you need today.</p>
-            </div>
-            <label className="search">
-              <Search size={17} />
-              <span className="sr-only">Search services</span>
-              <input
-                placeholder="Search services"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </label>
-          </div>
-          <div className="service-grid">
-            {list.map((s) => (
-              <ServiceCard key={s.id} s={s} ur={ur} />
-            ))}
-          </div>
-          {!list.length && (
-            <p className="empty">No services match your search.</p>
-          )}
-          <Sync error={q.error} at={q.data[0]?.syncedAt} />
-        </section>
-        <aside className="directory-aside">
-          <div className="aside-card">
-            <span className="eyebrow">A FAIRER WAY TO WAIT</span>
-            <h3>
-              Your place is
-              <br />
-              always clear.
-            </h3>
-            <ol className="steps">
-              <li>
-                <span>01</span>
-                <div>
-                  <strong>Choose a service</strong>
-                  <p>Check the queue and what to bring.</p>
-                </div>
-              </li>
-              <li>
-                <span>02</span>
-                <div>
-                  <strong>Get your private ticket</strong>
-                  <p>No name or student ID needed.</p>
-                </div>
-              </li>
-              <li>
-                <span>03</span>
-                <div>
-                  <strong>Watch for your turn</strong>
-                  <p>Your ticket updates automatically.</p>
-                </div>
-              </li>
-            </ol>
-            <Link href="/my-tickets" className="text-link">
-              Already in line? Find your ticket <ArrowRight size={16} />
-            </Link>
-          </div>
-          <div className="note-card">
-            <BookOpen size={21} />
-            <strong>A note about this campus</strong>
-            <p>
-              Cedar Campus is fictional. This is an open-source demo with
-              synthetic queue history.
-            </p>
-            <Link href="/demo">
-              Explore the demo <ArrowRight size={14} />
-            </Link>
-          </div>
-        </aside>
-      </div>
-      <div className="bottom-note">
-        <Users size={18} />
-        <span>
-          One place per service, per browser. Everyone follows the same queue.
-        </span>
-        <Link href="/how-it-works">
-          Our fair queue policy <ArrowRight size={15} />
+        <Link href="/my-tickets">
+          Find my tickets <ArrowRight size={16} />
         </Link>
       </div>
     </main>
   );
 }
-function TicketSymbol() {
-  return <GraduationCap size={25} />;
-}
-function ServiceCard({ s, ur }: { s: PublicService; ur: boolean }) {
+function ServiceCard({
+  s,
+  ur,
+  index,
+}: {
+  s: PublicService;
+  ur: boolean;
+  index: number;
+}) {
   const Icon =
     s.prefix === "FIN" ? Landmark : s.prefix === "IT" ? Laptop : GraduationCap;
+  const tone =
+    s.prefix === "FIN"
+      ? "finance"
+      : s.prefix === "IT"
+        ? "technology"
+        : "student";
   return (
-    <article className="service-card">
-      <div className="card-top">
-        <span className={`service-icon ${s.prefix.toLowerCase()}`}>
-          <Icon size={24} />
+    <article className={`service-card service-${tone}`}>
+      <div className="service-card-art">
+        <div className="art-grid" aria-hidden="true" />
+        <span className="service-index">
+          CAMPUS / {String(index + 1).padStart(2, "0")}
+        </span>
+        <span className="service-glyph" aria-hidden="true">
+          <Icon strokeWidth={1.35} />
+        </span>
+        <span className="art-prefix" aria-hidden="true">
+          {s.prefix}
         </span>
         <Badge
           state={
@@ -181,41 +236,50 @@ function ServiceCard({ s, ur }: { s: PublicService; ur: boolean }) {
           }
         />
       </div>
-      <h3>{s.name}</h3>
-      <p className="service-description">{s.description}</p>
-      <Location location={s.location} />
-      <div className="card-metrics">
-        <div>
-          <span>
-            <Users size={14} /> Waiting
-          </span>
-          <strong>
-            {s.waitingCount}
-            <small> people</small>
-          </strong>
+      <div className="service-card-content">
+        <div className="service-title-row">
+          <h3>{s.name}</h3>
+          <ArrowUpRight size={18} aria-hidden="true" />
         </div>
-        <div>
-          <span>
-            <Clock3 size={14} /> Approx. wait
+        <p className="service-description">{s.description}</p>
+        <div className="service-location">
+          <MapPin size={14} />
+          {s.location}
+        </div>
+        <div className="card-metrics">
+          <div>
+            <span>
+              <Clock3 size={14} /> Estimated wait
+            </span>
+            <strong className="wait-value">
+              {s.estimate.available
+                ? s.estimate.seconds! < 60
+                  ? "Up next"
+                  : s.estimate.label
+                : "Unavailable"}
+            </strong>
+          </div>
+          <div>
+            <span>
+              <Users size={14} /> In line
+            </span>
+            <strong>
+              {String(s.waitingCount).padStart(2, "0")}
+              <small> people</small>
+            </strong>
+          </div>
+        </div>
+        {s.pauseReason && <p className="notice">{s.pauseReason}</p>}
+        <div className="service-card-bottom">
+          <span className="card-hours">
+            {s.weeklyHours.open}–{s.weeklyHours.close} <small>PKT</small>
           </span>
-          <strong className="wait-value">
-            {s.estimate.available
-              ? s.estimate.seconds! < 60
-                ? "Up next"
-                : s.estimate.label
-              : "Unavailable"}
-          </strong>
+          <Link className="button card-action" href={`/services/${s.slug}`}>
+            {dictionaries[ur ? "ur" : "en"].viewQueue}
+            <ArrowRight size={16} />
+          </Link>
         </div>
       </div>
-      {s.pauseReason && <p className="notice">{s.pauseReason}</p>}
-      <div className="card-hours">
-        <span className="status-dot" />
-        {s.weeklyHours.open}–{s.weeklyHours.close} · PKT
-      </div>
-      <Link className="button outline full" href={`/services/${s.slug}`}>
-        {dictionaries[ur ? "ur" : "en"].viewQueue}
-        <ArrowRight size={17} />
-      </Link>
     </article>
   );
 }

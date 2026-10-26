@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowUpRight,
@@ -57,21 +58,45 @@ export function useLive<T>(path: string, interval: number) {
 }
 export function Header() {
   const { ur, toggle, t } = useLocale();
+  const pathname = usePathname();
   return (
     <header className="site-header">
       <Link className="brand" href="/">
         <span className="brand-mark">
           <Layers3 size={24} />
         </span>
-        QueueFair<span className="brand-dot">.</span>
+        QueueFair
+        <span className="brand-dot" aria-hidden="true">
+          .
+        </span>
       </Link>
       <nav aria-label="Main navigation">
-        <Link href="/">{t.services}</Link>
-        <Link href="/my-tickets">
+        <Link
+          href="/"
+          aria-current={
+            pathname === "/" || pathname.startsWith("/services/")
+              ? "page"
+              : undefined
+          }
+        >
+          {t.services}
+        </Link>
+        <Link
+          href="/my-tickets"
+          aria-current={
+            pathname === "/my-tickets" || pathname.startsWith("/tickets/")
+              ? "page"
+              : undefined
+          }
+        >
           <TicketIcon size={17} />
           <span>{t.myTickets}</span>
         </Link>
-        <Link className="desktop-only" href="/how-it-works">
+        <Link
+          className="desktop-only"
+          href="/how-it-works"
+          aria-current={pathname === "/how-it-works" ? "page" : undefined}
+        >
           How it works
         </Link>
       </nav>
