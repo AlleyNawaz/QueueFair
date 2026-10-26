@@ -70,6 +70,12 @@ A successful deployment can still return an API error if its database cannot be 
 | DATABASE_CONFIGURATION_INVALID | Check the PostgreSQL URL format and database name.                                                                                                                 |
 | DATABASE_UNAVAILABLE           | Check provider availability, reachable hostname/port, pooling and TLS settings. Do not disable certificate validation as a workaround.                             |
 
-There are two connected Vercel projects in this workspace's deployment history: `queuefair` and `queue-fair`. Configure the project that serves the domain you are actually opening. Settings applied to one project are not automatically applied to the other. In the reported screenshot the domain was `queue-fair.vercel.app`; earlier dashboard screenshots showed the separate `queuefair` project.
+The latest verified production project is `queuefair`, served at `https://queuefair.vercel.app`. The older `queue-fair.vercel.app` alias returned Vercel `DEPLOYMENT_NOT_FOUND` on 2026-10-26; use the live `queuefair` domain. Do not infer that two project names share deployment settings or databases.
 
 The directory now ends its initial loading state on failure and offers a retry. Retrying cannot repair missing tables or invalid credentials: those require correcting the hosted database setup above.
+
+## Latest production check — 2026-10-26
+
+GitHub reports Vercel deployment success for commit `312d3c37a19bf3a3bfdb4ca98463a124448afa67`. A public HTTP check of `https://queuefair.vercel.app/` returned 200, and `/api/services` returned 200 with `{ "data": [] }`. The API can now read the migrated database, but the service catalog is empty, so the demo has not been seeded and students cannot join a queue yet. The old `queue-fair.vercel.app` host returned Vercel `DEPLOYMENT_NOT_FOUND`.
+
+To provision the fictional demo once, add `DEMO_MODE=true` and unique `DEMO_STAFF_PASSWORD` / `DEMO_ADMIN_PASSWORD` values (at least 12 characters) to a private `.env.vercel-db` containing the production `DATABASE_URL`, then run `node --env-file=.env.vercel-db node_modules/tsx/dist/cli.mjs prisma/seed.ts` from the repository root. Use `APP_ORIGIN=https://queuefair.vercel.app` and a fresh `SESSION_SECRET` in Vercel Production before using login or mutations. Never commit or paste the secrets into chat. The seed command is intentionally not part of deploy builds and refuses a non-empty database.

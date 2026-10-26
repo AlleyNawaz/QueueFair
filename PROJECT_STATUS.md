@@ -48,3 +48,10 @@
 - CLI connection preference is DIRECT_URL / DATABASE_URL_UNPOOLED / DATABASE_URL; the running application still uses DATABASE_URL.
 - A guarded fresh local *_test database was created for an actual Production-build workflow test. The build applied exactly one committed migration, created the Service table, seeded zero services and compiled successfully. The temporary test database was then removed; development and existing test fixtures were not reset by this check.
 - The directory now distinguishes an unconfigured empty service catalog from a search with no matches. After schema initialization, demo seeding remains an explicit step with environment-provided passwords.
+
+## Live Vercel verification — 2026-10-26
+
+- Commit `312d3c37a19bf3a3bfdb4ca98463a124448afa67` is pushed to `main`; GitHub reports the Vercel deployment successful for project `queuefair`.
+- Public HTTP verification: `https://queuefair.vercel.app/` returned 200; `/api/services` returned 200 with `{ "data": [] }`. This confirms the runtime can read the migrated schema, but the production catalog is empty and the student flow is not provisioned yet.
+- The screenshot hostname `queue-fair.vercel.app` now returns Vercel `DEPLOYMENT_NOT_FOUND`. The current live project alias is `queuefair.vercel.app`.
+- Vercel CLI is logged out in this workspace, and there are no hosted credentials in the local ignored environment files. Production has not been seeded or tested for staff login/queue mutations. Follow the explicit private seed setup in `docs/VERCEL.md`; never seed from a deployment build or share secrets in chat.
