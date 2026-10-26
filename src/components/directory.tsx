@@ -7,6 +7,8 @@ import {
   Check,
   Clock3,
   GraduationCap,
+  RefreshCw,
+  ServerOff,
   Landmark,
   Laptop,
   MapPin,
@@ -28,8 +30,29 @@ export function Directory() {
   if (!q.data)
     return (
       <main className="page">
-        <ErrorBox error={q.error} />
-        <Loading />
+        {q.isError ? (
+          <section className="panel queue-load-error">
+            <span className="queue-load-error-icon">
+              <ServerOff size={27} />
+            </span>
+            <span className="eyebrow">SERVICE CONNECTION</span>
+            <h1>We couldn’t load the queues.</h1>
+            <p>
+              Please retry shortly. If this continues, contact the service team.
+            </p>
+            <ErrorBox error={q.error} />
+            <button
+              className="button"
+              disabled={q.isFetching}
+              onClick={() => q.refetch()}
+            >
+              <RefreshCw size={16} />
+              {q.isFetching ? "Retrying…" : "Try again"}
+            </button>
+          </section>
+        ) : (
+          <Loading />
+        )}
       </main>
     );
   const list = q.data.filter((s) =>

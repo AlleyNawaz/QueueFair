@@ -32,3 +32,11 @@
 - Verified from another isolated checkout with no .env, generated client, DATABASE_URL, APP_ORIGIN, SESSION_SECRET or demo passwords: frozen install and full production build passed; production page shell returned HTTP 200; /api/services returned expected 503 DATABASE_NOT_CONFIGURED; migrate deploy refused missing datasource.url.
 - Lint, typecheck and all nine existing E2E tests passed. CI’s final build now explicitly unsets DATABASE_URL and removes the generated client.
 - Remaining external setup: attach hosted PostgreSQL to the queuefair Production environment, set DATABASE_URL, APP_ORIGIN and SESSION_SECRET, explicitly migrate/seed that hosted database, and redeploy. User has been asked whether a hosted database already exists. Do not claim a working queue from build success alone.
+
+## Runtime queue failure — 2026-10-26
+
+- User screenshot opens queue-fair.vercel.app; direct HTTP check confirmed /api/services returned 500 INTERNAL_ERROR while the page returned 200. This is a runtime failure, not the previous build failure. Exact cause pending deployed diagnostic response.
+- Added allowlisted Prisma/PostgreSQL error classification: schema initialization, database access, URL configuration and connectivity return safe 503 categories. Raw messages, hosts, SQL and secrets remain hidden. A real unreachable-driver probe produced P1001 and was correctly classified.
+- Initial directory failures now replace the spinner with an error/retry view and recover after a successful retry. Existing stale-data behavior remains unchanged.
+- Actual checks: 64 unit tests, 10 browser tests, lint, strict typecheck and production build passed. Tests cover error redaction, initialization errorCode, wrapped adapter errors, existing conflict handling, and failed directory recovery.
+- Vercel CLI remains logged out. Hosted credentials and runtime logs cannot be accessed through the CLI. Only local DB URLs exist in ignored .env files. Earlier queuefair and current queue-fair project settings must not be confused.

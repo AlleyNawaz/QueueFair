@@ -33,6 +33,7 @@ import {
   counterSchema,
 } from "@/lib/contracts";
 import { db } from "@/server/db";
+import { databaseFailure } from "@/server/database-errors";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ path: string[] }> };
@@ -248,6 +249,17 @@ async function handle(req: NextRequest, ctx: Context) {
         { error: { code: error.code, message: error.message } },
         { status: error.status, headers: { "Cache-Control": "no-store" } },
       );
+    const databaseError = databaseFailure(error);
+    if (databaseError) {
+      console.error("QueueFair database request failed:", databaseError.code);
+      return NextResponse.json(
+        { error: { code: databaseError.code, message: databaseError.message } },
+        {
+          status: databaseError.status,
+          headers: { "Cache-Control": "no-store" },
+        },
+      );
+    }
     if ((error as { code?: string }).code === "P2002")
       return NextResponse.json(
         {

@@ -361,3 +361,30 @@ test("credential errors are generic, rate limits persist, and logout revokes acc
   expect((await context.request.get("/api/staff/overview")).status()).toBe(401);
   expect(await db.authSession.count()).toBe(0);
 });
+
+test("initial directory failure ends loading and retry recovers", async ({
+  page,
+}) => {
+  await page.route("**/api/services", (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: {
+          code: "DATABASE_UNAVAILABLE",
+          message: "The queue database connection is unavailable.",
+        },
+      }),
+    }),
+  );
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "We couldn’t load the queues." }),
+  ).toBeVisible();
+  await expect(page.getByText("Loading the latest queue…")).toHaveCount(0);
+  await page.unroute("**/api/services");
+  await page.getByRole("button", { name: "Try again", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Campus services" }),
+  ).toBeVisible();
+});

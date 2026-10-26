@@ -3347,3 +3347,39 @@ legend {
     right: 16px;
   }
 }
+
+.queue-load-error {
+  max-width: 650px;
+  margin: 35px auto;
+  padding: 38px;
+}
+.queue-load-error-icon {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  background: var(--teal-soft);
+  color: var(--teal);
+  border-radius: 15px;
+  margin-bottom: 25px;
+}
+.queue-load-error h1 {
+  font-size: 32px;
+  letter-spacing: -1.2px;
+}
+.queue-load-error > p {
+  font-size: 13px;
+  line-height: 1.8;
+}
+.queue-load-error .button {
+  margin-top: 8px;
+}
+@media (max-width: 600px) {
+  .queue-load-error {
+    margin: 15px auto;
+    padding: 25px;
+  }
+  .queue-load-error h1 {
+    font-size: 28px;
+  }
+}

@@ -57,3 +57,19 @@ No successful remote deployment is implied by a successful local build. Hosted c
 If build logs show `prisma generate && next build` followed by `PrismaConfigEnvError: Cannot resolve environment variable`, the old Prisma config is requiring `DATABASE_URL` even for client generation. This repository now makes the datasource optional for schema-only commands, following [Prisma’s optional environment variable guidance](https://www.prisma.io/docs/orm/v7/reference/prisma-config-reference#handling-optional-environment-variables). Deploy the latest commit.
 
 For the actual queue, open the **queuefair** project → **Environment Variables**, add `DATABASE_URL` for **Production** using your hosted PostgreSQL provider’s connection string, and redeploy. Set `APP_ORIGIN` to the canonical HTTPS domain you will use and `SESSION_SECRET` to a fresh random value of at least 32 characters. Preview variables are separate from Production. Do not use a localhost URL or a dummy database URL: they can allow a build to finish but cannot run the queue. Apply migrations and seed the fresh demo database explicitly as above.
+
+## Page loads but queues fail at runtime
+
+A successful deployment can still return an API error if its database cannot be reached or has no QueueFair schema. Open `/api/services` on the same domain you are using. The API returns safe categories without exposing hosts, SQL, passwords or stack traces:
+
+| Error code                     | Action                                                                                                                                 |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| DATABASE_NOT_CONFIGURED        | Set the hosted DATABASE_URL in this project's Production environment, then redeploy.                                                   |
+| DATABASE_NOT_INITIALIZED       | Apply committed migrations to that hosted database, then seed only if it is an empty fictional demo.                                   |
+| DATABASE_ACCESS_FAILED         | Check the database credentials and permissions in the configured connection string.                                                    |
+| DATABASE_CONFIGURATION_INVALID | Check the PostgreSQL URL format and database name.                                                                                     |
+| DATABASE_UNAVAILABLE           | Check provider availability, reachable hostname/port, pooling and TLS settings. Do not disable certificate validation as a workaround. |
+
+There are two connected Vercel projects in this workspace's deployment history: `queuefair` and `queue-fair`. Configure the project that serves the domain you are actually opening. Settings applied to one project are not automatically applied to the other. In the reported screenshot the domain was `queue-fair.vercel.app`; earlier dashboard screenshots showed the separate `queuefair` project.
+
+The directory now ends its initial loading state on failure and offers a retry. Retrying cannot repair missing tables or invalid credentials: those require correcting the hosted database setup above.
