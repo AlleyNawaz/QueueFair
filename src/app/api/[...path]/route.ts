@@ -41,6 +41,12 @@ async function handle(req: NextRequest, ctx: Context) {
     const { path: p } = await ctx.params;
     const method = req.method;
     if (method !== "GET") checkOrigin(req);
+    assert(
+      process.env.DATABASE_URL?.trim(),
+      503,
+      "DATABASE_NOT_CONFIGURED",
+      "QueueFair's database is not configured. Set DATABASE_URL in the deployment environment.",
+    );
     const key = req.headers.get("idempotency-key") ?? "";
     const json = async () => {
       try {

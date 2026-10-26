@@ -23,3 +23,12 @@
 - Verification: isolated Git-archive checkout, no generated client, no .env files, fresh frozen install, and an unreachable placeholder DATABASE_URL. Build exited 0 and generated the client automatically without contacting a live database. An offline install first failed due to unavailable registry metadata; the normal online frozen install passed. Lint, typecheck and formatting passed.
 - Added docs/VERCEL.md covering hosted PostgreSQL, canonical HTTPS APP_ORIGIN, SESSION_SECRET, explicit migrations and demo seed. Builds never reset or seed a database.
 - GitHub reported two linked failed Vercel projects: queuefair and queue-fair. No Vercel connector/CLI is connected; Firefox computer access was not approved. Actual cloud environment/migrations/deployment remain unverified until the user provides project details or cloud access.
+
+## Vercel missing DATABASE_URL follow-up — 2026-10-26
+
+- User confirmed the failing Production project is `queuefair`; latest logs run Prisma generation but fail while loading config because DATABASE_URL is missing.
+- Prisma datasource config is now conditional for schema-only commands, following official Prisma 7 optional-environment guidance. No dummy credentials or fallback database are introduced. Migrations still require the URL.
+- API now explicitly returns 503 DATABASE_NOT_CONFIGURED if DATABASE_URL is absent, rather than issuing fake tickets or attempting normal queue operations.
+- Verified from another isolated checkout with no .env, generated client, DATABASE_URL, APP_ORIGIN, SESSION_SECRET or demo passwords: frozen install and full production build passed; production page shell returned HTTP 200; /api/services returned expected 503 DATABASE_NOT_CONFIGURED; migrate deploy refused missing datasource.url.
+- Lint, typecheck and all nine existing E2E tests passed. CI’s final build now explicitly unsets DATABASE_URL and removes the generated client.
+- Remaining external setup: attach hosted PostgreSQL to the queuefair Production environment, set DATABASE_URL, APP_ORIGIN and SESSION_SECRET, explicitly migrate/seed that hosted database, and redeploy. User has been asked whether a hosted database already exists. Do not claim a working queue from build success alone.

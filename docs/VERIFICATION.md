@@ -60,3 +60,9 @@ The user requested a more contemporary visual design, using Stripe and Airbnb as
 - Primary directory buttons measured 44px tall. Focus indicators, helper contrast, reduced-motion styles and print styles were retained/refined.
 - Updated screenshots were captured from the running local development server; only the development tooling overlay was hidden for clean captures. The original production smoke record above still refers to the initial implementation. A new production build passed after the visual work.
 - Unit and database integration tests were not repeated for this UI-only change; their previously recorded passes remain above. No database or backend source files changed.
+
+## Missing database configuration during deployment — 2026-10-26
+
+Prisma config no longer requires DATABASE_URL for schema-only client generation. This was checked in an isolated fresh checkout with no generated client, no .env files and no database/deployment secrets: `pnpm install --frozen-lockfile` and `pnpm build` passed. The resulting production server returned HTTP 200 for the page shell and the expected HTTP 503 / DATABASE_NOT_CONFIGURED for `/api/services`. `prisma migrate deploy` without a URL failed with the required datasource.url error. No dummy database URL was used in this verification.
+
+Lint and strict typecheck passed, and all nine browser scenarios passed with the configured separate test database. CI now tests the production build with DATABASE_URL explicitly unset and generated Prisma output removed. A real hosted database and production secrets remain required for operational queue/authentication workflows; successful compilation is not a claim of working hosted persistence.
