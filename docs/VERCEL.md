@@ -2,9 +2,9 @@
 
 ## Build configuration
 
-Use the Next.js framework preset, repository root `./`, Node 24, install command `pnpm install --frozen-lockfile`, and build command `pnpm build`. Keep the default Next.js output directory. The committed `vercel.json` enforces the Next.js framework and `pnpm build`, overriding any older dashboard build-command setting. Do not replace it with `next build` alone.
+Use the Next.js framework preset, repository root `./`, Node 24, install command `pnpm install --frozen-lockfile`, and build command `pnpm build:vercel`. Keep the default Next.js output directory. The committed `vercel.json` enforces the Next.js framework and `pnpm build:vercel`, overriding any older dashboard build-command setting. Do not replace it with `next build` alone.
 
-The project’s build script runs `prisma generate && next build`. The generated client lives at `src/generated/prisma` and is intentionally ignored by Git; it must be generated on every build, including when dependencies are cached. This fixes `Module not found: Can't resolve '@/generated/prisma/client'`. See the [official Prisma 7 Vercel guidance](https://www.prisma.io/docs/orm/v7/more/troubleshooting/nextjs).
+The ordinary local build script runs `prisma generate && next build`. Vercel uses `pnpm build:vercel`, which generates the client, applies committed migrations only when VERCEL_ENV=production and DATABASE_URL is present, then builds Next.js. Preview deployments never migrate a database automatically. Migration failure stops the deployment; the script never resets or seeds data. The generated client lives at `src/generated/prisma` and is intentionally ignored by Git; it must be generated on every build, including when dependencies are cached. This fixes `Module not found: Can't resolve '@/generated/prisma/client'`. See the [official Prisma 7 Vercel guidance](https://www.prisma.io/docs/orm/v7/more/troubleshooting/nextjs).
 
 Generation does not apply migrations, seed the database, or require a live database connection. `prisma.config.ts` makes the URL optional for schema-only generation, so builds can finish before a database is attached. Database commands still require a real URL, and the running API returns a clear 503 `DATABASE_NOT_CONFIGURED` error until `DATABASE_URL` is supplied. A successful build alone does not mean the queue is operational.
 
@@ -26,7 +26,7 @@ Use a separate database and matching `APP_ORIGIN` for Preview deployments. Openi
 
 ## Initialize the database once
 
-Before using the app, run the committed migrations against the hosted database using a private, ignored environment file on a trusted machine. If the provider offers a separate direct connection for migrations, use that connection for this step.
+Production deployments now apply the committed migrations automatically when DATABASE_URL is configured. For a manual initialization or a Preview database, run the committed migrations against the hosted database using a private, ignored environment file on a trusted machine. Prisma CLI prefers DIRECT_URL, then DATABASE_URL_UNPOOLED, then DATABASE_URL. Set a provider’s direct/unpooled URL for migration operations if supplied; the running app continues to use DATABASE_URL. For manual initialization, keep these values in the private file.
 
 ```sh
 # .env.vercel-db is a private local file containing the hosted DATABASE_URL.
@@ -40,12 +40,12 @@ For a fresh fictional demo database, also place `DEMO_MODE=true`, fresh `DEMO_ST
 node --env-file=.env.vercel-db node_modules/tsx/dist/cli.mjs prisma/seed.ts
 ```
 
-Seed refuses a non-empty database. This provisions `staff@queuefair.demo` and `admin@queuefair.demo` with those passwords. Password variables are needed by this explicit seed command, not by the running app, and changing them later does not reset stored password hashes. Do not use `demo:reset` to initialize or repair a deployed database. Builds never reset or seed databases automatically.
+Seed refuses a non-empty database. This provisions `staff@queuefair.demo` and `admin@queuefair.demo` with those passwords. Password variables are needed by this explicit seed command, not by the running app, and changing them later does not reset stored password hashes. Do not use `demo:reset` to initialize or repair a deployed database. Builds never reset or seed databases automatically. Only the production Vercel build applies committed schema migrations.
 
 ## Redeploy and verify
 
 1. Push the build fix and select the latest commit in Vercel.
-2. Confirm the build command is `pnpm build`; redeploy. If troubleshooting a stale deployment, uncheck “Use existing Build Cache” for that run. The normal build itself generates Prisma even with cached dependencies.
+2. Confirm the build command is `pnpm build:vercel`; redeploy. If troubleshooting a stale deployment, uncheck “Use existing Build Cache” for that run. The normal build itself generates Prisma even with cached dependencies.
 3. Build logs should show generated Prisma Client followed by the Next.js build.
 4. Visit `/api/services`: after migrations/seed, it should return `{ "data": [...] }`. An empty list means no services are configured; a 503 `DATABASE_NOT_CONFIGURED` means `DATABASE_URL` is missing; a 500 requires checking runtime database/configuration logs.
 5. At the exact `APP_ORIGIN`, join a service and verify `/my-tickets`; sign in as staff, call/start/complete; open the public display. Use HTTPS so production Secure cookies are sent.
@@ -62,13 +62,13 @@ For the actual queue, open the **queuefair** project → **Environment Variables
 
 A successful deployment can still return an API error if its database cannot be reached or has no QueueFair schema. Open `/api/services` on the same domain you are using. The API returns safe categories without exposing hosts, SQL, passwords or stack traces:
 
-| Error code                     | Action                                                                                                                                 |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| DATABASE_NOT_CONFIGURED        | Set the hosted DATABASE_URL in this project's Production environment, then redeploy.                                                   |
-| DATABASE_NOT_INITIALIZED       | Apply committed migrations to that hosted database, then seed only if it is an empty fictional demo.                                   |
-| DATABASE_ACCESS_FAILED         | Check the database credentials and permissions in the configured connection string.                                                    |
-| DATABASE_CONFIGURATION_INVALID | Check the PostgreSQL URL format and database name.                                                                                     |
-| DATABASE_UNAVAILABLE           | Check provider availability, reachable hostname/port, pooling and TLS settings. Do not disable certificate validation as a workaround. |
+| Error code                     | Action                                                                                                                                                             |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| DATABASE_NOT_CONFIGURED        | Set the hosted DATABASE_URL in this project's Production environment, then redeploy.                                                                               |
+| DATABASE_NOT_INITIALIZED       | The Production build applies committed migrations automatically. For a manual or Preview setup, apply them explicitly; seed only if it is an empty fictional demo. |
+| DATABASE_ACCESS_FAILED         | Check the database credentials and permissions in the configured connection string.                                                                                |
+| DATABASE_CONFIGURATION_INVALID | Check the PostgreSQL URL format and database name.                                                                                                                 |
+| DATABASE_UNAVAILABLE           | Check provider availability, reachable hostname/port, pooling and TLS settings. Do not disable certificate validation as a workaround.                             |
 
 There are two connected Vercel projects in this workspace's deployment history: `queuefair` and `queue-fair`. Configure the project that serves the domain you are actually opening. Settings applied to one project are not automatically applied to the other. In the reported screenshot the domain was `queue-fair.vercel.app`; earlier dashboard screenshots showed the separate `queuefair` project.
 

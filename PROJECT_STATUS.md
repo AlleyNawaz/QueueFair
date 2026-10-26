@@ -40,3 +40,11 @@
 - Initial directory failures now replace the spinner with an error/retry view and recover after a successful retry. Existing stale-data behavior remains unchanged.
 - Actual checks: 64 unit tests, 10 browser tests, lint, strict typecheck and production build passed. Tests cover error redaction, initialization errorCode, wrapped adapter errors, existing conflict handling, and failed directory recovery.
 - Vercel CLI remains logged out. Hosted credentials and runtime logs cannot be accessed through the CLI. Only local DB URLs exist in ignored .env files. Earlier queuefair and current queue-fair project settings must not be confused.
+
+## Confirmed missing hosted schema and production migration fix
+
+- The deployed queue-fair API now explicitly returns 503 DATABASE_NOT_INITIALIZED. Its PostgreSQL connection succeeds but the QueueFair schema is missing.
+- Vercel production builds now run the committed `prisma migrate deploy` between client generation and Next compilation when DATABASE_URL is present. Generic local builds and Preview builds do not migrate. Nothing resets or seeds automatically.
+- CLI connection preference is DIRECT_URL / DATABASE_URL_UNPOOLED / DATABASE_URL; the running application still uses DATABASE_URL.
+- A guarded fresh local *_test database was created for an actual Production-build workflow test. The build applied exactly one committed migration, created the Service table, seeded zero services and compiled successfully. The temporary test database was then removed; development and existing test fixtures were not reset by this check.
+- The directory now distinguishes an unconfigured empty service catalog from a search with no matches. After schema initialization, demo seeding remains an explicit step with environment-provided passwords.

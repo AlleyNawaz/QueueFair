@@ -160,7 +160,11 @@ export function Directory() {
         {!list.length && (
           <div className="empty">
             <Search size={26} />
-            <p>No services match your search.</p>
+            <p>
+              {q.data.length === 0
+                ? "Campus services are being set up. Please check back shortly."
+                : "No services match your search."}
+            </p>
           </div>
         )}
         <div className="directory-refresh">

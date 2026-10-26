@@ -23,7 +23,8 @@
     "format": "prettier --write .",
     "db:migrate:test": "node --env-file=.env.test node_modules/prisma/build/index.js migrate deploy",
     "demo:env": "node scripts/setup-env.mjs",
-    "db:rollover": "tsx scripts/rollover.ts"
+    "db:rollover": "tsx scripts/rollover.ts",
+    "build:vercel": "node scripts/vercel-build.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.1",

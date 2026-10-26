@@ -41,7 +41,7 @@ Set the URL port to `55432` and use the password supplied to `initdb`. The curre
 
 ## Deploy to Vercel
 
-Follow the [Vercel setup guide](docs/VERCEL.md) for hosted PostgreSQL, environment variables, migrations and seeding. Use `pnpm build`: it generates the Prisma client before compiling Next.js, including on cached builds. Your local database URL cannot be used from Vercel.
+Follow the [Vercel setup guide](docs/VERCEL.md) for hosted PostgreSQL, environment variables, migrations and seeding. Vercel uses `pnpm build:vercel`: it generates Prisma, applies committed migrations to a configured Production database, and builds Next.js. Local `pnpm build` still generates Prisma and compiles without migrating. Your local database URL cannot be used from Vercel.
 
 ## Demo accounts and routes
 

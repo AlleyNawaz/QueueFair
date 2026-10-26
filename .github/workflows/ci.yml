@@ -50,7 +50,7 @@ jobs:
       - name: Build without generated Prisma files or database credentials
         run: |
           rm -rf src/generated/prisma
-          env -u DATABASE_URL pnpm build
+          env -u DATABASE_URL -u DIRECT_URL -u DATABASE_URL_UNPOOLED VERCEL_ENV=preview pnpm build:vercel
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

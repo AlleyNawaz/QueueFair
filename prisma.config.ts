@@ -2,7 +2,10 @@ import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
 // Client generation only needs the schema. Database commands still require a URL.
-const databaseUrl = process.env.DATABASE_URL?.trim();
+const databaseUrl =
+  process.env.DIRECT_URL?.trim() ||
+  process.env.DATABASE_URL_UNPOOLED?.trim() ||
+  process.env.DATABASE_URL?.trim();
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: { path: "prisma/migrations", seed: "tsx prisma/seed.ts" },
