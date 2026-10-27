@@ -2,7 +2,7 @@
 
 Node runtime route handler: `src/app/api/[...path]/route.ts`. All successful responses are `{ "data": ... }`; failures are `{ "error": { "code": "...", "message": "safe text", "fields": { "name": ["validation error"] } } }` (fields only when relevant). Queue reads are no-store. Dates are ISO UTC except server-derived `localDate` strings.
 
-Every mutation requires `Origin` equal to `APP_ORIGIN`. Browser fetch sends this automatically. Cookies are HttpOnly, SameSite=Lax, Secure in production. Do not send cookie secrets in URLs. No state changes occur through GET.
+Every mutation validates `Origin`. When `APP_ORIGIN` is set, the origin must match it; otherwise the request must be same-origin with its URL. Browser fetch sends this automatically. Cookies are HttpOnly, SameSite=Lax, Secure in production. Do not send cookie secrets in URLs. No state changes occur through GET.
 
 ## Public and owner
 

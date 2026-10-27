@@ -27,7 +27,7 @@ pnpm db:seed
 pnpm dev
 ```
 
-Open **http://127.0.0.1:3000**. Use exactly the origin in `APP_ORIGIN`; cookie-authenticated mutations reject other origins. Seed runs only against an empty database with `DEMO_MODE=true`. Startup never resets or seeds the database.
+Open **http://127.0.0.1:3000**. Cookie-authenticated mutations reject cross-origin requests; `APP_ORIGIN` can pin the canonical origin explicitly. Seed runs only against an empty database or the untouched starter catalog with `DEMO_MODE=true`. Startup never resets or seeds the database.
 
 Docker unavailable? Supply your own PostgreSQL 16 instance and set `DATABASE_URL`. Create an empty `queuefair_demo` database owned by your configured user. This app does not fall back to SQLite or browser storage. For an isolated Homebrew instance:
 

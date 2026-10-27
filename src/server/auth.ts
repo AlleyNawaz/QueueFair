@@ -104,10 +104,12 @@ export async function logout() {
   jar.delete("qf_auth");
 }
 export function checkOrigin(request: Request) {
-  const configured = process.env.APP_ORIGIN;
-  assert(configured, 500, "CONFIGURATION", "APP_ORIGIN must be configured.");
+  const configured = process.env.APP_ORIGIN?.trim();
+  const expectedOrigin = configured
+    ? new URL(configured).origin
+    : new URL(request.url).origin;
   assert(
-    request.headers.get("origin") === new URL(configured).origin,
+    request.headers.get("origin") === expectedOrigin,
     403,
     "ORIGIN_REJECTED",
     "This request must originate from QueueFair.",
@@ -119,15 +121,15 @@ export async function rateLimit(
   limit: number,
   windowSeconds = 60,
 ) {
+  const secret =
+    process.env.SESSION_SECRET?.trim() || process.env.DATABASE_URL?.trim();
   assert(
-    process.env.SESSION_SECRET && process.env.SESSION_SECRET.length >= 32,
+    secret && secret.length >= 32,
     500,
     "CONFIGURATION",
-    "A session secret of at least 32 characters is required.",
+    "A 32-character SESSION_SECRET or DATABASE_URL is required.",
   );
-  const digest = createHmac("sha256", process.env.SESSION_SECRET)
-    .update(identity)
-    .digest("hex");
+  const digest = createHmac("sha256", secret).update(identity).digest("hex");
   const key = `${scope}:${digest}:${Math.floor(Date.now() / (windowSeconds * 1000))}`;
   const bucket = await db.rateLimitBucket.upsert({
     where: { key },
