@@ -79,3 +79,7 @@ The directory now ends its initial loading state on failure and offers a retry. 
 GitHub reports Vercel deployment success for commit `312d3c37a19bf3a3bfdb4ca98463a124448afa67`. A public HTTP check of `https://queuefair.vercel.app/` returned 200, and `/api/services` returned 200 with `{ "data": [] }`. The API could read the migrated database, but the service catalog was empty, so students could not join a queue. The old `queue-fair.vercel.app` host returned Vercel `DEPLOYMENT_NOT_FOUND`.
 
 To provision the fictional demo once, add `DEMO_MODE=true` and unique `DEMO_STAFF_PASSWORD` / `DEMO_ADMIN_PASSWORD` values (at least 12 characters) to a private `.env.vercel-db` containing the production `DATABASE_URL`, then run `node --env-file=.env.vercel-db node_modules/tsx/dist/cli.mjs prisma/seed.ts` from the repository root. Set `APP_ORIGIN=https://queuefair.vercel.app` and a fresh `SESSION_SECRET` in Vercel Production for explicit, stable configuration. Never commit or paste the secrets into chat. The seed command is intentionally not part of deploy builds and refuses operational data.
+
+## Production catalog fix — 2026-10-27
+
+Commit `997951ccd294234b0063a4d1a8cce0236c8b155f` deployed successfully. `/api/services` now returns Finance Desk, IT Help Desk, and Student Affairs with five active counters. A live same-origin anonymous session, join, and cancellation cleanup all returned HTTP 200. The catalog bootstrap creates no staff/admin accounts or synthetic ticket history; run the guarded explicit seed above when those demo workflows are needed.
