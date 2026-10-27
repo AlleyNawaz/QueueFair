@@ -1,5 +1,10 @@
-import { redirect } from "next/navigation";
+import { OfficeDetailView } from "@/components/office-meetings";
 
-export default function RetiredMeetingRoute() {
-  redirect("/");
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  return <OfficeDetailView slug={slug} />;
 }

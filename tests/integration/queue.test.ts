@@ -10,6 +10,13 @@ import {
   officeCommand,
 } from "../../src/server/queue";
 import { publicState, privateTicket } from "../../src/server/reads";
+import {
+  createMeetingRequest,
+  meetingRequestDetail,
+  officeInbox,
+  staffMeetingDecision,
+  studentMeetingCommand,
+} from "../../src/server/meetings";
 import { randomUUID } from "node:crypto";
 const now = new Date("2026-10-26T08:00:00Z");
 let sid: string;
@@ -70,6 +77,8 @@ beforeEach(async () => {
   const office = await db.service.create({
     data: {
       serviceType: "OFFICE",
+      meetingRequestsEnabled: true,
+      meetingRequestReasonOptions: ["Housing question", "Policy clarification"],
       slug: "test-office",
       name: "Test Office",
       prefix: "OFF",
@@ -382,4 +391,284 @@ it("office notes require explicit service configuration and never enter public D
   expect(publicJson).not.toContain("private detail");
   expect(publicJson).not.toContain('"visitReasonCode"');
   expect(publicJson).not.toContain('"note"');
+});
+
+it("meeting requests are idempotent, private to the owner, and ordered for review", async () => {
+  const o = await owner();
+  const input = {
+    reason: "Housing question",
+    note: "A private note",
+  };
+  const key = randomUUID();
+  const created = await createMeetingRequest(officeId, o, input, key, now);
+  const replay = await createMeetingRequest(officeId, o, input, key, now);
+  expect(replay).toEqual(created);
+  expect(created).toMatchObject({ existing: false });
+  await expect(
+    createMeetingRequest(officeId, o, { ...input, note: "changed" }, key, now),
+  ).rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT" });
+  const duplicate = await createMeetingRequest(
+    officeId,
+    o,
+    input,
+    randomUUID(),
+    now,
+  );
+  expect(duplicate).toMatchObject({
+    existing: true,
+    publicId: created.publicId,
+  });
+  const detail = await meetingRequestDetail(created.publicId, o, now);
+  expect(detail).toMatchObject({
+    reference: "OFF-M-20261026-001",
+    reviewPosition: 1,
+  });
+  expect(detail.note).toBe("A private note");
+  await expect(
+    meetingRequestDetail(created.publicId, await owner(), now),
+  ).rejects.toMatchObject({ status: 404 });
+  const publicJson = JSON.stringify((await publicState(officeId, now)).dto);
+  expect(publicJson).not.toContain("A private note");
+  expect(publicJson).not.toContain(created.publicId);
+  expect(publicJson).not.toContain('"note"');
+});
+
+it("keeps human-readable references unique while review sequence restarts each local day", async () => {
+  const firstOwner = await owner();
+  const first = await createMeetingRequest(
+    officeId,
+    firstOwner,
+    { reason: "Housing question" },
+    randomUUID(),
+    now,
+  );
+  const nextDay = new Date(+now + 86400_000);
+  const second = await createMeetingRequest(
+    officeId,
+    await owner(),
+    { reason: "Policy clarification" },
+    randomUUID(),
+    nextDay,
+  );
+  const firstRequest = await db.officeMeetingRequest.findUniqueOrThrow({
+    where: { publicId: first.publicId },
+  });
+  const secondRequest = await db.officeMeetingRequest.findUniqueOrThrow({
+    where: { publicId: second.publicId },
+  });
+  expect(firstRequest.queueSequence).toBe(1);
+  expect(secondRequest.queueSequence).toBe(1);
+  expect(firstRequest.publicReference).not.toBe(secondRequest.publicReference);
+});
+
+it("meeting review access requires a direct office or explicit descendant assignment", async () => {
+  const parent = await db.service.create({
+    data: {
+      serviceType: "OFFICE",
+      directoryGroup: true,
+      slug: "test-routing-group",
+      name: "Test routing group",
+      prefix: "ROUTE",
+      description: "Test routing parent",
+      location: "Test",
+      weeklyHours: {
+        days: [0, 1, 2, 3, 4, 5, 6],
+        open: "00:00",
+        close: "23:59",
+      },
+      visitReasonOptions: ["Help"],
+      documentRequirements: [],
+    },
+  });
+  await db.service.update({
+    where: { id: officeId },
+    data: { parentServiceId: parent.id },
+  });
+  const childManager = await db.user.create({
+    data: {
+      email: "child-manager@test.invalid",
+      displayName: "Child manager",
+      role: "STAFF",
+      passwordHash: "unused",
+    },
+  });
+  const parentManager = await db.user.create({
+    data: {
+      email: "parent-manager@test.invalid",
+      displayName: "Parent manager",
+      role: "STAFF",
+      passwordHash: "unused",
+    },
+  });
+  const counterOnly = await db.user.create({
+    data: {
+      email: "counter-only@test.invalid",
+      displayName: "Counter only",
+      role: "STAFF",
+      passwordHash: "unused",
+    },
+  });
+  const counter = await db.counter.create({
+    data: { serviceId: officeId, name: "Meeting room counter" },
+  });
+  await db.staffAssignment.createMany({
+    data: [
+      { userId: childManager.id, serviceId: officeId },
+      {
+        userId: parentManager.id,
+        serviceId: parent.id,
+        canManageDescendants: true,
+      },
+      {
+        userId: counterOnly.id,
+        serviceId: officeId,
+        counterId: counter.id,
+      },
+    ],
+  });
+  expect((await officeInbox(childManager)).offices.map((o) => o.id)).toContain(
+    officeId,
+  );
+  expect((await officeInbox(parentManager)).offices.map((o) => o.id)).toContain(
+    officeId,
+  );
+  expect((await officeInbox(counterOnly)).offices).toHaveLength(0);
+  await expect(officeInbox(counterOnly, officeId)).rejects.toMatchObject({
+    status: 403,
+  });
+});
+
+it("officer accept, proposal response, decline, and completion persist each decision", async () => {
+  const o = await owner();
+  const request = await createMeetingRequest(
+    officeId,
+    o,
+    { reason: "Housing question" },
+    randomUUID(),
+    now,
+  );
+  const meetingId = (
+    await db.officeMeetingRequest.findUniqueOrThrow({
+      where: { publicId: request.publicId },
+      select: { id: true },
+    })
+  ).id;
+  const at = new Date(+now + 2 * 3600_000);
+  const proposal = new Date(+now + 3 * 3600_000);
+  const accepted = await staffMeetingDecision(
+    meetingId,
+    await db.user.findUniqueOrThrow({ where: { id: staff } }),
+    { action: "accept", at: at.toISOString() },
+    randomUUID(),
+    now,
+  );
+  expect(accepted.status).toBe("ACCEPTED");
+  await staffMeetingDecision(
+    meetingId,
+    await db.user.findUniqueOrThrow({ where: { id: staff } }),
+    {
+      action: "propose",
+      at: proposal.toISOString(),
+      reason: "Office schedule changed",
+    },
+    randomUUID(),
+    now,
+  );
+  const proposed = await meetingRequestDetail(request.publicId, o, now);
+  expect(proposed).toMatchObject({ status: "RESCHEDULE_PROPOSED" });
+  await studentMeetingCommand(
+    request.publicId,
+    o,
+    "decline-proposal",
+    randomUUID(),
+    now,
+  );
+  const declined = await meetingRequestDetail(request.publicId, o, now);
+  expect(declined).toMatchObject({
+    status: "ACCEPTED",
+    scheduledAt: at.toISOString(),
+  });
+  await staffMeetingDecision(
+    meetingId,
+    await db.user.findUniqueOrThrow({ where: { id: staff } }),
+    { action: "complete" },
+    randomUUID(),
+    at,
+  );
+  expect((await meetingRequestDetail(request.publicId, o, at)).status).toBe(
+    "COMPLETED",
+  );
+  const stored = await db.officeMeetingRequest.findUniqueOrThrow({
+    where: { publicId: request.publicId },
+    include: { events: true },
+  });
+  expect(stored.events.map((event) => event.eventType)).toEqual([
+    "REQUESTED",
+    "ACCEPTED",
+    "RESCHEDULE_PROPOSED",
+    "PROPOSAL_DECLINED_KEPT_ACCEPTED_TIME",
+    "COMPLETED",
+  ]);
+});
+
+it("serializes competing accepts so one officer time has one accepted request", async () => {
+  const first = await createMeetingRequest(
+    officeId,
+    await owner(),
+    { reason: "Housing question" },
+    randomUUID(),
+    now,
+  );
+  const second = await createMeetingRequest(
+    officeId,
+    await owner(),
+    { reason: "Policy clarification" },
+    randomUUID(),
+    now,
+  );
+  const officer = await db.user.findUniqueOrThrow({ where: { id: staff } });
+  const firstId = (
+    await db.officeMeetingRequest.findUniqueOrThrow({
+      where: { publicId: first.publicId },
+      select: { id: true },
+    })
+  ).id;
+  const secondId = (
+    await db.officeMeetingRequest.findUniqueOrThrow({
+      where: { publicId: second.publicId },
+      select: { id: true },
+    })
+  ).id;
+  const sameTime = new Date(+now + 2 * 3600_000).toISOString();
+  const results = await Promise.allSettled([
+    staffMeetingDecision(
+      firstId,
+      officer,
+      { action: "accept", at: sameTime },
+      randomUUID(),
+      now,
+    ),
+    staffMeetingDecision(
+      secondId,
+      officer,
+      { action: "accept", at: sameTime },
+      randomUUID(),
+      now,
+    ),
+  ]);
+  expect(
+    results.filter((result) => result.status === "fulfilled"),
+  ).toHaveLength(1);
+  expect(results.filter((result) => result.status === "rejected")).toHaveLength(
+    1,
+  );
+  expect(
+    await db.officeMeetingRequest.count({
+      where: {
+        serviceId: officeId,
+        status: "ACCEPTED",
+        scheduledAt: new Date(sameTime),
+      },
+    }),
+  ).toBe(1);
 });

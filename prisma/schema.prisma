@@ -1,224 +1,279 @@
 generator client {
- provider = "prisma-client"
- output = "../src/generated/prisma"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
+
 datasource db {
- provider = "postgresql"
+  provider = "postgresql"
 }
+
 model User {
- id String @id @default(uuid())
- email String @unique
- passwordHash String
- role String
- displayName String
- createdAt DateTime @default(now())
- sessions AuthSession[]
- assignments StaffAssignment[]
+  id           String            @id @default(uuid())
+  email        String            @unique
+  passwordHash String
+  role         String
+  displayName  String
+  createdAt    DateTime          @default(now())
+  sessions     AuthSession[]
+  assignments  StaffAssignment[]
 }
+
 model AuthSession {
- hashedToken String @id
- userId String
- user User @relation(fields:[userId],references:[id],onDelete:Cascade)
- expiresAt DateTime
- createdAt DateTime @default(now())
- @@index([userId])
+  hashedToken String   @id
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
 }
+
 model AnonymousSession {
- id String @id @default(uuid())
- hashedSecret String @unique
- expiresAt DateTime
- createdAt DateTime @default(now())
- tickets Ticket[]
- participations ActiveParticipation[]
- meetingRequests OfficeMeetingRequest[]
+  id              String                 @id @default(uuid())
+  hashedSecret    String                 @unique
+  expiresAt       DateTime
+  createdAt       DateTime               @default(now())
+  tickets         Ticket[]
+  participations  ActiveParticipation[]
+  meetingRequests OfficeMeetingRequest[]
 }
+
 model Service {
- id String @id @default(uuid())
- serviceType String @default("DESK")
- allowNote Boolean @default(true)
- parentServiceId String?
- parentService Service? @relation("ServiceHierarchy", fields:[parentServiceId], references:[id], onDelete:SetNull)
- childServices Service[] @relation("ServiceHierarchy")
- positionTitle String?
- officeSourceUrl String?
- meetingRequestsEnabled Boolean @default(false)
- meetingDurationMinutes Int @default(20)
- meetingRequestReasonOptions String[] @default([])
- slug String @unique
- name String
- description String
- prefix String
- location String
- state String @default("OPEN")
- pauseReason String?
- notice String @default("")
- timezone String @default("Asia/Karachi")
- weeklyHours Json
- defaultServiceSeconds Int @default(360)
- gracePeriodSeconds Int @default(120)
- maxWaitingTickets Int @default(100)
- documentRequirements String[]
- visitReasonOptions String[]
- createdAt DateTime @default(now())
- updatedAt DateTime @updatedAt
- counters Counter[]
- days ServiceDay[]
- assignments StaffAssignment[]
- events ServiceEvent[]
- meetingRequests OfficeMeetingRequest[]
- @@index([parentServiceId])
+  id                               String                 @id @default(uuid())
+  serviceType                      String                 @default("DESK")
+  allowNote                        Boolean                @default(true)
+  parentServiceId                  String?
+  parentService                    Service?               @relation("ServiceHierarchy", fields: [parentServiceId], references: [id], onDelete: SetNull)
+  childServices                    Service[]              @relation("ServiceHierarchy")
+  positionTitle                    String?
+  officeSourceUrl                  String?
+  meetingRequestsEnabled           Boolean                @default(false)
+  meetingDurationMinutes           Int                    @default(20)
+  meetingRequestReasonOptions      String[]               @default([])
+  meetingBookingHorizonDays        Int                    @default(30)
+  meetingCancellationCutoffMinutes Int                    @default(60)
+  meetingDailyCapacity             Int                    @default(8)
+  directoryGroup                   Boolean                @default(false)
+  slug                             String                 @unique
+  name                             String
+  description                      String
+  prefix                           String
+  location                         String
+  state                            String                 @default("OPEN")
+  pauseReason                      String?
+  notice                           String                 @default("")
+  timezone                         String                 @default("Asia/Karachi")
+  weeklyHours                      Json
+  defaultServiceSeconds            Int                    @default(360)
+  gracePeriodSeconds               Int                    @default(120)
+  maxWaitingTickets                Int                    @default(100)
+  documentRequirements             String[]
+  visitReasonOptions               String[]
+  createdAt                        DateTime               @default(now())
+  updatedAt                        DateTime               @updatedAt
+  counters                         Counter[]
+  days                             ServiceDay[]
+  assignments                      StaffAssignment[]
+  events                           ServiceEvent[]
+  meetingRequests                  OfficeMeetingRequest[]
+  meetingDays                      OfficeMeetingDay[]
+
+  @@index([parentServiceId])
 }
+
 model Counter {
- id String @id @default(uuid())
- serviceId String
- service Service @relation(fields:[serviceId],references:[id])
- name String
- state String @default("OFFLINE")
- pauseReason String?
- tickets Ticket[]
- events ServiceEvent[]
- assignments StaffAssignment[]
- @@unique([serviceId,name])
+  id          String            @id @default(uuid())
+  serviceId   String
+  service     Service           @relation(fields: [serviceId], references: [id])
+  name        String
+  state       String            @default("OFFLINE")
+  pauseReason String?
+  tickets     Ticket[]
+  events      ServiceEvent[]
+  assignments StaffAssignment[]
+
+  @@unique([serviceId, name])
 }
+
 model StaffAssignment {
- id String @id @default(uuid())
- userId String
- user User @relation(fields:[userId],references:[id])
- serviceId String
- service Service @relation(fields:[serviceId],references:[id])
- counterId String?
- counter Counter? @relation(fields:[counterId],references:[id])
- canManageDescendants Boolean @default(false)
- @@index([userId,serviceId])
+  id                   String   @id @default(uuid())
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id])
+  serviceId            String
+  service              Service  @relation(fields: [serviceId], references: [id])
+  counterId            String?
+  counter              Counter? @relation(fields: [counterId], references: [id])
+  canManageDescendants Boolean  @default(false)
+
+  @@index([userId, serviceId])
 }
+
 model ServiceDay {
- id String @id @default(uuid())
- serviceId String
- service Service @relation(fields:[serviceId],references:[id])
- localDate String
- prefix String
- nextTokenSequence Int @default(1)
- nextQueueSequence Int @default(1)
- tickets Ticket[]
- participations ActiveParticipation[]
- @@unique([serviceId,localDate])
+  id                String                @id @default(uuid())
+  serviceId         String
+  service           Service               @relation(fields: [serviceId], references: [id])
+  localDate         String
+  prefix            String
+  nextTokenSequence Int                   @default(1)
+  nextQueueSequence Int                   @default(1)
+  tickets           Ticket[]
+  participations    ActiveParticipation[]
+
+  @@unique([serviceId, localDate])
 }
+
 model Ticket {
- id String @id @default(uuid())
- publicId String @unique @default(uuid())
- serviceDayId String
- serviceDay ServiceDay @relation(fields:[serviceDayId],references:[id])
- anonymousSessionId String
- anonymousSession AnonymousSession @relation(fields:[anonymousSessionId],references:[id])
- tokenSequence Int
- tokenLabel String
- queueSequence Int
- status String @default("WAITING")
- visitReasonCode String
- note String?
- assignedCounterId String?
- assignedCounter Counter? @relation(fields:[assignedCounterId],references:[id])
- rejoinCount Int @default(0)
- joinedAt DateTime @default(now())
- queueEnteredAt DateTime @default(now())
- calledAt DateTime?
- serviceStartedAt DateTime?
- completedAt DateTime?
- missedAt DateTime?
- cancelledAt DateTime?
- expiredAt DateTime?
- updatedAt DateTime @updatedAt
- events TicketEvent[]
- participation ActiveParticipation?
- @@unique([serviceDayId,tokenSequence])
- @@unique([serviceDayId,queueSequence])
- @@index([serviceDayId,status,queueSequence])
- @@index([assignedCounterId,status])
- @@index([anonymousSessionId])
- @@index([completedAt])
+  id                 String               @id @default(uuid())
+  publicId           String               @unique @default(uuid())
+  serviceDayId       String
+  serviceDay         ServiceDay           @relation(fields: [serviceDayId], references: [id])
+  anonymousSessionId String
+  anonymousSession   AnonymousSession     @relation(fields: [anonymousSessionId], references: [id])
+  tokenSequence      Int
+  tokenLabel         String
+  queueSequence      Int
+  status             String               @default("WAITING")
+  visitReasonCode    String
+  note               String?
+  assignedCounterId  String?
+  assignedCounter    Counter?             @relation(fields: [assignedCounterId], references: [id])
+  rejoinCount        Int                  @default(0)
+  joinedAt           DateTime             @default(now())
+  queueEnteredAt     DateTime             @default(now())
+  calledAt           DateTime?
+  serviceStartedAt   DateTime?
+  completedAt        DateTime?
+  missedAt           DateTime?
+  cancelledAt        DateTime?
+  expiredAt          DateTime?
+  updatedAt          DateTime             @updatedAt
+  events             TicketEvent[]
+  participation      ActiveParticipation?
+
+  @@unique([serviceDayId, tokenSequence])
+  @@unique([serviceDayId, queueSequence])
+  @@index([serviceDayId, status, queueSequence])
+  @@index([assignedCounterId, status])
+  @@index([anonymousSessionId])
+  @@index([completedAt])
 }
+
 model TicketEvent {
- id String @id @default(uuid())
- ticketId String
- ticket Ticket @relation(fields:[ticketId],references:[id])
- eventType String
- actorKind String
- actorUserId String?
- createdAt DateTime @default(now())
- metadata Json @default("{}")
- @@index([ticketId,createdAt])
- @@index([eventType,createdAt])
+  id          String   @id @default(uuid())
+  ticketId    String
+  ticket      Ticket   @relation(fields: [ticketId], references: [id])
+  eventType   String
+  actorKind   String
+  actorUserId String?
+  createdAt   DateTime @default(now())
+  metadata    Json     @default("{}")
+
+  @@index([ticketId, createdAt])
+  @@index([eventType, createdAt])
 }
+
 model ServiceEvent {
- id String @id @default(uuid())
- serviceId String
- service Service @relation(fields:[serviceId],references:[id])
- counterId String?
- counter Counter? @relation(fields:[counterId],references:[id])
- eventType String
- actorUserId String
- createdAt DateTime @default(now())
- metadata Json @default("{}")
- @@index([serviceId,createdAt])
+  id          String   @id @default(uuid())
+  serviceId   String
+  service     Service  @relation(fields: [serviceId], references: [id])
+  counterId   String?
+  counter     Counter? @relation(fields: [counterId], references: [id])
+  eventType   String
+  actorUserId String
+  createdAt   DateTime @default(now())
+  metadata    Json     @default("{}")
+
+  @@index([serviceId, createdAt])
 }
+
 model OfficeMeetingRequest {
- id String @id @default(uuid())
- publicId String @unique @default(uuid())
- serviceId String
- service Service @relation(fields:[serviceId],references:[id])
- anonymousSessionId String
- anonymousSession AnonymousSession @relation(fields:[anonymousSessionId],references:[id])
- status String @default("REQUESTED")
- reasonCode String
- note String?
- durationMinutes Int @default(20)
- preferredAt DateTime?
- scheduledAt DateTime?
- proposedAt DateTime?
- decisionReason String?
- createdAt DateTime @default(now())
- updatedAt DateTime @updatedAt
- events OfficeMeetingEvent[]
- @@index([serviceId,status,createdAt])
- @@index([anonymousSessionId,createdAt])
- @@index([serviceId,scheduledAt])
+  id                 String               @id @default(uuid())
+  publicId           String               @unique @default(uuid())
+  serviceId          String
+  service            Service              @relation(fields: [serviceId], references: [id])
+  officeDayId        String?
+  officeDay          OfficeMeetingDay?    @relation(fields: [officeDayId], references: [id])
+  reviewDate         String?
+  queueSequence      Int?
+  publicReference    String?              @unique
+  anonymousSessionId String
+  anonymousSession   AnonymousSession     @relation(fields: [anonymousSessionId], references: [id])
+  status             String               @default("REQUESTED")
+  reasonCode         String
+  note               String?
+  durationMinutes    Int                  @default(20)
+  preferredAt        DateTime?
+  scheduledAt        DateTime?
+  proposedAt         DateTime?
+  decisionReason     String?
+  completedAt        DateTime?
+  cancelledAt        DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  events             OfficeMeetingEvent[]
+
+  @@index([serviceId, status, createdAt])
+  @@index([anonymousSessionId, createdAt])
+  @@index([serviceId, scheduledAt])
+  @@index([serviceId, proposedAt])
+  @@index([officeDayId, queueSequence])
 }
+
+model OfficeMeetingDay {
+  id                String                 @id @default(uuid())
+  serviceId         String
+  service           Service                @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  localDate         String
+  prefix            String
+  nextQueueSequence Int                    @default(1)
+  requests          OfficeMeetingRequest[]
+
+  @@unique([serviceId, localDate])
+}
+
 model OfficeMeetingEvent {
- id String @id @default(uuid())
- requestId String
- request OfficeMeetingRequest @relation(fields:[requestId],references:[id],onDelete:Cascade)
- eventType String
- actorKind String
- actorUserId String?
- createdAt DateTime @default(now())
- metadata Json @default("{}")
- @@index([requestId,createdAt])
- @@index([eventType,createdAt])
+  id          String               @id @default(uuid())
+  requestId   String
+  request     OfficeMeetingRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  eventType   String
+  actorKind   String
+  actorUserId String?
+  createdAt   DateTime             @default(now())
+  metadata    Json                 @default("{}")
+
+  @@index([requestId, createdAt])
+  @@index([eventType, createdAt])
 }
+
 model ActiveParticipation {
- id String @id @default(uuid())
- anonymousSessionId String
- anonymousSession AnonymousSession @relation(fields:[anonymousSessionId],references:[id])
- serviceDayId String
- serviceDay ServiceDay @relation(fields:[serviceDayId],references:[id])
- ticketId String @unique
- ticket Ticket @relation(fields:[ticketId],references:[id])
- @@unique([anonymousSessionId,serviceDayId])
+  id                 String           @id @default(uuid())
+  anonymousSessionId String
+  anonymousSession   AnonymousSession @relation(fields: [anonymousSessionId], references: [id])
+  serviceDayId       String
+  serviceDay         ServiceDay       @relation(fields: [serviceDayId], references: [id])
+  ticketId           String           @unique
+  ticket             Ticket           @relation(fields: [ticketId], references: [id])
+
+  @@unique([anonymousSessionId, serviceDayId])
 }
+
 model IdempotencyRecord {
- id String @id @default(uuid())
- actor String
- operation String
- key String
- payloadDigest String
- result Json
- expiresAt DateTime
- @@unique([actor,operation,key])
- @@index([expiresAt])
+  id            String   @id @default(uuid())
+  actor         String
+  operation     String
+  key           String
+  payloadDigest String
+  result        Json
+  expiresAt     DateTime
+
+  @@unique([actor, operation, key])
+  @@index([expiresAt])
 }
+
 model RateLimitBucket {
- key String @id
- count Int
- resetAt DateTime
- @@index([resetAt])
+  key     String   @id
+  count   Int
+  resetAt DateTime
+
+  @@index([resetAt])
 }

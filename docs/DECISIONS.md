@@ -20,10 +20,13 @@
 - The visual direction is an ink-and-paper campus wayfinding board: compact numbered desk labels, tabular queue counts, indigo action color, quiet service-state badges, and clear queue text. No other product’s layout, logo, illustration, or palette is copied.
 - No AWS service is integrated or claimed; the queue remains PostgreSQL-backed.
 
-## Office walk-in queue and retired scheduler code — 2026-10-27
+## Office walk-in and meeting-request distinction — 2026-10-27
 
 - Office audiences use the existing same-day FIFO service queue, with direct staff assignments, audited pause/resume, bounded optional notes, and the configured call/arrival grace. Joining is not an appointment or guaranteed meeting.
-- Appointment runtime routes, UI, and API behavior have been retired. Historical migrations and dormant Prisma models remain because the corresponding migration was already applied locally and migration history must remain immutable; no current app route or queue command reads or writes those models. A future cleanup can remove them only through a deliberate forward migration after verifying every target database.
+- A scheduled office request is separate from a same-day walk-in ticket. A request remains unconfirmed until an assigned officer accepts a concrete office-hours time. A preferred time is not a reservation, a proposal waits for the student’s response, and no email/SMS notification is sent.
+- The directory’s Field Administration parent and child links are a routing aid inferred from public remit. The public role titles and linked sources are reference-only. They never grant inbox permissions; direct assignment or an explicit descendant-scope assignment does.
+- Office review sequence uses its own per-office/day counter and does not change walk-in FIFO order. A Service row lock serializes competing slot decisions, review-sequence allocation, and idempotency writes across application instances. The configured review queue limit uses `maxWaitingTickets`; accepted/proposed calendar capacity is a separate per-office-day setting.
+- Historical unused appointment migrations/models from the earlier branch remain where already applied. New meeting-request routes use `OfficeMeetingRequest` and `OfficeMeetingEvent`; they do not reuse or rewrite that dormant schema.
 - The office operator pause notice is public-safe. Optional student note and reason are returned only in owner/private-ticket and assigned-staff DTOs. Public directory/display DTOs remain allowlisted.
 
 ## Installed versions and official sources

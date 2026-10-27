@@ -82,6 +82,16 @@ export function Header() {
           {t.services}
         </Link>
         <Link
+          href="/offices"
+          aria-current={
+            pathname === "/offices" || pathname.startsWith("/offices/")
+              ? "page"
+              : undefined
+          }
+        >
+          Meet an officer
+        </Link>
+        <Link
           href="/my-tickets"
           aria-current={
             pathname === "/my-tickets" || pathname.startsWith("/tickets/")

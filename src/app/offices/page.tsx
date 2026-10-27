@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { OfficeDirectory } from "@/components/office-meetings";
 
-export default function RetiredMeetingRoute() {
-  redirect("/");
+export default function Page() {
+  return <OfficeDirectory />;
 }

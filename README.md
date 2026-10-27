@@ -45,23 +45,30 @@ Follow the [Vercel setup guide](docs/VERCEL.md) for hosted PostgreSQL, environme
 
 ## Demo accounts and routes
 
-| Purpose                     | Route / account                                                               |
-| --------------------------- | ----------------------------------------------------------------------------- |
-| Student services            | `/`, `/services/finance-desk`                                                 |
-| Private ticket / history    | `/tickets/[publicId]`, `/my-tickets`                                          |
-| Student instructions        | `/how-it-works`                                                               |
-| Staff                       | `/login` → `/staff`, `/staff/counters/[counterId]`                            |
-| Staff email                 | `staff@queuefair.demo`, password from `DEMO_STAFF_PASSWORD`                   |
-| Assigned hostel officer     | `hostel.officer@queuefair.demo`, password from `DEMO_HOSTEL_OFFICER_PASSWORD` |
-| Assigned activities officer | `sports.officer@queuefair.demo`, password from `DEMO_SPORTS_OFFICER_PASSWORD` |
-| Administrator               | `/admin`, `/admin/services`, `/admin/analytics`                               |
-| Admin email                 | `admin@queuefair.demo`, password from `DEMO_ADMIN_PASSWORD`                   |
-| Public display              | `/display/finance-desk`                                                       |
-| Office walk-in lines        | `/services/cedar-hostel-office`, `/services/campus-activities-office`         |
-| Assigned officer workspace  | `/staff` · only explicitly assigned offices/counters                          |
-| Walkthrough                 | `/demo`, [demo guide](docs/DEMO.md)                                           |
+| Purpose                      | Route / account                                                               |
+| ---------------------------- | ----------------------------------------------------------------------------- |
+| Student services             | `/`, `/services/finance-desk`                                                 |
+| Private ticket / history     | `/tickets/[publicId]`, `/my-tickets`                                          |
+| Student instructions         | `/how-it-works`                                                               |
+| Office directory / hierarchy | `/offices` · `/offices/[slug]`                                                |
+| Private meeting requests     | `/my-meetings` · `/meeting-requests/[publicId]`                               |
+| Staff                        | `/login` → `/staff`, `/staff/counters/[counterId]`                            |
+| Assigned officer inbox       | `/staff/meetings`                                                             |
+| Staff email                  | `staff@queuefair.demo`, password from `DEMO_STAFF_PASSWORD`                   |
+| Assigned hostel officer      | `hostel.officer@queuefair.demo`, password from `DEMO_HOSTEL_OFFICER_PASSWORD` |
+| Assigned activities officer  | `sports.officer@queuefair.demo`, password from `DEMO_SPORTS_OFFICER_PASSWORD` |
+| Administrator                | `/admin`, `/admin/services`, `/admin/analytics`                               |
+| Admin email                  | `admin@queuefair.demo`, password from `DEMO_ADMIN_PASSWORD`                   |
+| Public display               | `/display/finance-desk`                                                       |
+| Office walk-in lines         | `/services/cedar-hostel-office`, `/services/campus-activities-office`         |
+| Assigned officer workspace   | `/staff` · only explicitly assigned offices/counters                          |
+| Walkthrough                  | `/demo`, [demo guide](docs/DEMO.md)                                           |
 
-Use separate browser profiles/incognito windows for a demo. The seed includes three fictional service desks and two fictional same-day office walk-in lines. Cedar Hostel Office starts paused for a meeting with one synthetic waiting ticket; the line keeps its FIFO order when the assigned officer resumes it. Campus Activities Office is assigned to its own officer account. These are walk-in queues, not appointment requests, guaranteed meeting times, or private correspondence. Join anonymously with a broad visit reason; optional notes are limited to 240 characters and visible only to the owner and assigned staff. Finance starts empty so the live demo can join and call a new ticket. Other desk history is synthetic. The campus and offices are fictional and do not imply institutional endorsement.
+Use separate browser profiles/incognito windows for a demo. The seed includes three fictional desks and two fictional same-day office walk-in lines; both offices can also receive private meeting requests. Students can request office review, see their review position, and follow an officer’s accept/reject/propose decision at `/my-meetings`. Review position does not predict response time. A proposed time is not accepted until the student responds. No email or SMS is sent.
+
+The `/offices` directory includes public role titles and source links as a configurable routing reference. Its Field Administration parent/child grouping is inferred navigation only and never grants authorization. Every reference page displays: “Independent QueueFair prototype. NUST’s public directory is used only as a routing reference; this is not an official NUST service and does not confirm officer availability.” No NUST logo, employee name, direct contact or credential is included. Hostel and Sports demo officers are synthetic accounts; an administrator must explicitly assign each office inbox or descendant scope.
+
+Cedar Hostel Office starts paused for its same-day walk-in line with one synthetic waiting ticket; the line keeps its FIFO order when the assigned officer resumes it. Its separate meeting-request review queue remains available. Optional meeting context is limited to 240 characters and visible only to the owner and assigned office inbox. Finance starts empty so the live desk demo can join and call a new ticket. Other history is synthetic. These examples do not imply institutional endorsement or officer availability.
 
 ## Scripts
 

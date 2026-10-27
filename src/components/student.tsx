@@ -29,6 +29,7 @@ import {
   useLive,
 } from "./shared";
 import { useLocale } from "./providers";
+import { ReferenceDisclaimer } from "./office-meetings";
 export function ServiceView({ slug }: { slug: string }) {
   const q = useLive<PublicService[]>("services", 3000);
   const router = useRouter();
@@ -96,6 +97,10 @@ export function ServiceView({ slug }: { slug: string }) {
           Open public display <ArrowRight size={16} />
         </Link>
       </div>
+      {s.serviceType === "OFFICE" &&
+        s.officeSourceUrl?.includes("nust.edu.pk") && (
+          <ReferenceDisclaimer text="Independent QueueFair prototype. NUST’s public directory is used only as a routing reference; this is not an official NUST service and does not confirm officer availability." />
+        )}
       <div className="two-column">
         <section className="stack">
           <div className="panel">
@@ -542,6 +547,10 @@ export function MyTickets() {
       <span className="eyebrow">SAVED IN THIS BROWSER</span>
       <h1>My tickets</h1>
       <p>Keep track of your campus visits, all in one place.</p>
+      <p>
+        Looking for an office decision?{" "}
+        <Link href="/my-meetings">My meeting requests</Link>.
+      </p>
       <ErrorBox error={q.error} />
       {!q.data ? (
         <Loading />
@@ -590,6 +599,10 @@ export function Display({ slug }: { slug: string }) {
     );
   return (
     <main className="display-page" dir={ur ? "rtl" : "ltr"}>
+      {s.serviceType === "OFFICE" &&
+        s.officeSourceUrl?.includes("nust.edu.pk") && (
+          <ReferenceDisclaimer text="Independent QueueFair prototype. NUST’s public directory is used only as a routing reference; this is not an official NUST service and does not confirm officer availability." />
+        )}
       <div className="display-header">
         <div>
           <span className="eyebrow">

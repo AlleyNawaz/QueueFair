@@ -2,12 +2,12 @@
 
 All campus names and stored example history are fictional/synthetic. This is near-real-time polling, not offline ticketing. Keep a student browser and a separate incognito/profile staff browser open at the same canonical origin.
 
-The seed now includes three fictional campus desks and two fictional same-day office walk-in queues. Login passwords come from ignored `.env` variables and are not committed or printed by the seed.
+The seed now includes three fictional campus desks, two fictional same-day office walk-in queues, and a configurable office routing reference. The Hostel and Sports offices accept a separate meeting-request workflow. Login passwords come from ignored `.env` variables and are not committed or printed by the seed.
 
 - `hostel.officer@queuefair.demo` uses `DEMO_HOSTEL_OFFICER_PASSWORD` and is assigned only to Cedar Hostel Office.
 - `sports.officer@queuefair.demo` uses `DEMO_SPORTS_OFFICER_PASSWORD` and is assigned only to Campus Activities Office.
 
-Cedar Hostel Office starts paused with the public notice “In a meeting; existing queue order is preserved.” Resume it as the assigned officer to accept walk-ins. Its 30-second demo arrival window is intentionally short; use a service-specific grace such as 300 seconds for normal office operation. This is a FIFO walk-in queue, not a scheduled meeting or promised time.
+Hostel Administration starts with its walk-in line paused with the public notice “In a meeting; existing queue order is preserved.” Resume it as the assigned officer to accept walk-ins. Its 30-second demo arrival window is intentionally short; use a service-specific grace such as 300 seconds for normal office operation. This same-day FIFO line is separate from scheduled meeting requests.
 
 ## Prepare
 
@@ -17,6 +17,9 @@ Cedar Hostel Office starts paused with the public notice “In a meeting; existi
 4. In a separate browser profile, sign in at `/login` and open the assigned Finance Counter 1 workspace. Call the ticket, then show the student’s live update. Start and complete the visit; the call and completion update the same persisted ticket.
 5. Keep `/display/finance-desk` ready in a third tab. Other services contain the seeded waiting, called and serving examples. Seeded demo grace is 10 seconds, visibly labeled; normal grace is 120 seconds. To show missed/rejoin, create a second student-owned Finance ticket, call it, wait the short grace, explicitly mark it missed, and rejoin from that same student browser.
 6. For the office story, open `/services/cedar-hostel-office` as a student and `/login` in a separate profile as `hostel.officer@queuefair.demo`. The office starts paused with one synthetic waiting ticket. Resume the same-day walk-in line; the existing ticket remains first. Have the student join with a broad reason and optional non-sensitive note, open the officer workspace, call the next eligible ticket, then start and complete it. The private ticket tells the student when to go and shows the configured short arrival window. The public office display shows token/counter state only. This is not appointment scheduling or a guaranteed meeting time.
+7. For the office-reviewed meeting path, open `/offices`, choose **Hostel Administration**, submit a broad topic and optional short note, and keep the student page open. In the officer profile, open `/staff/meetings`, choose a future time within the displayed office hours, and accept. The student request updates by polling and displays the accepted local time. Use reject or propose in another request to show the other outcomes. A proposed time remains unconfirmed until the student accepts; declining a first proposal returns the request to the review tail. The office’s review position is not an officer-response estimate. No notification is sent outside the page.
+
+The directory is an independent prototype. Public NUST directory pages supply role-title/source references only; the Field Administration parent/child grouping is inferred for navigation and grants no access. The pages carry the disclaimer: “Independent QueueFair prototype. NUST’s public directory is used only as a routing reference; this is not an official NUST service and does not confirm officer availability.” No real employee details or credentials are seeded.
 
 ## Narration and actions
 

@@ -33,9 +33,22 @@ import {
   reasonSchema,
   serviceSchema,
   counterSchema,
+  meetingRequestSchema,
+  meetingDecisionSchema,
+  meetingResponseSchema,
 } from "@/lib/contracts";
 import { db } from "@/server/db";
 import { databaseFailure } from "@/server/database-errors";
+import {
+  createMeetingRequest,
+  meetingRequestDetail,
+  myMeetingRequests,
+  officeDetail,
+  officeDirectory,
+  officeInbox,
+  staffMeetingDecision,
+  studentMeetingCommand,
+} from "@/server/meetings";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ path: string[] }> };
@@ -59,7 +72,52 @@ async function handle(req: NextRequest, ctx: Context) {
       }
     };
     let data: unknown;
-    if (method === "GET" && p.join("/") === "services") data = await services();
+    if (method === "GET" && p.join("/") === "offices")
+      data = await officeDirectory();
+    else if (method === "GET" && p[0] === "offices" && p.length === 2)
+      data = await officeDetail(p[1]);
+    else if (method === "POST" && p[0] === "offices" && p[2] === "requests") {
+      const input = meetingRequestSchema.parse(await json());
+      const owner = await anonymous();
+      assert(owner, 401, "OWNER_REQUIRED", "Browser ownership is required.");
+      await rateLimit("meeting-create", owner.id, 8);
+      data = await createMeetingRequest(p[1], owner.id, input, key);
+    } else if (method === "GET" && p.join("/") === "me/meeting-requests") {
+      const owner = await anonymous();
+      data = owner ? await myMeetingRequests(owner.id) : [];
+    } else if (method === "GET" && p.join("/") === "staff/meetings") {
+      data = await officeInbox(
+        await requireUser(),
+        req.nextUrl.searchParams.get("officeId") ?? undefined,
+        req.nextUrl.searchParams.get("status") ?? undefined,
+      );
+    } else if (
+      method === "POST" &&
+      p[0] === "staff" &&
+      p[1] === "meetings" &&
+      p[3] === "decision"
+    ) {
+      const input = meetingDecisionSchema.parse(await json());
+      data = await staffMeetingDecision(p[2], await requireUser(), input, key);
+    } else if (p[0] === "meeting-requests" && p.length >= 2) {
+      const owner = await anonymous();
+      assert(
+        owner,
+        404,
+        "NOT_FOUND",
+        "Meeting request not found in this browser.",
+      );
+      await rateLimit("meeting-request", owner.id, 120);
+      if (method === "GET" && p.length === 2)
+        data = await meetingRequestDetail(p[1], owner.id);
+      else if (method === "POST" && p[2] === "cancel")
+        data = await studentMeetingCommand(p[1], owner.id, "cancel", key);
+      else if (method === "POST" && p[2] === "respond") {
+        const input = meetingResponseSchema.parse(await json());
+        data = await studentMeetingCommand(p[1], owner.id, input.action, key);
+      } else throw new AppError(404, "NOT_FOUND", "Endpoint not found.");
+    } else if (method === "GET" && p.join("/") === "services")
+      data = await services();
     else if (method === "GET" && p[0] === "services" && p[2] === "public-state")
       data = (await publicState(p[1])).dto;
     else if (method === "POST" && p[0] === "services" && p[2] === "tickets") {
@@ -181,6 +239,40 @@ async function handle(req: NextRequest, ctx: Context) {
         p[1] === "services"
       ) {
         const input = serviceSchema.parse(await json());
+        if (input.parentServiceId) {
+          assert(
+            input.parentServiceId !== p[2],
+            422,
+            "INVALID_PARENT",
+            "An office cannot be its own parent.",
+          );
+          const parent = await db.service.findUnique({
+            where: { id: input.parentServiceId },
+          });
+          assert(
+            parent?.serviceType === "OFFICE",
+            422,
+            "INVALID_PARENT",
+            "Choose an existing office as the routing parent.",
+          );
+          let cursor: string | null = parent.id;
+          const visited = new Set<string>();
+          while (cursor && !visited.has(cursor)) {
+            assert(
+              cursor !== p[2],
+              422,
+              "INVALID_PARENT",
+              "This parent would create an office routing cycle.",
+            );
+            visited.add(cursor);
+            const ancestor: { parentServiceId: string | null } | null =
+              await db.service.findUnique({
+                where: { id: cursor },
+                select: { parentServiceId: true },
+              });
+            cursor = ancestor?.parentServiceId ?? null;
+          }
+        }
         if (method === "PATCH") {
           assert(p[2], 400, "ID_REQUIRED", "A service id is required.");
           data = await updateService(p[2], input, user.id);
@@ -247,6 +339,80 @@ async function handle(req: NextRequest, ctx: Context) {
             },
           });
           return { id: c.id };
+        });
+      } else if (method === "POST" && p[1] === "assignments") {
+        const input = z
+          .object({
+            serviceId: z.string().min(1),
+            userId: z.string().min(1),
+            counterId: z.string().min(1).nullable().optional(),
+            canManageDescendants: z.boolean().default(false),
+          })
+          .strict()
+          .parse(await json());
+        data = await locked(input.serviceId, async (tx, service) => {
+          const assignedUser = await tx.user.findUnique({
+            where: { id: input.userId },
+          });
+          assert(
+            assignedUser?.role === "STAFF",
+            422,
+            "INVALID_USER",
+            "Choose a staff account.",
+          );
+          const counterId = input.counterId ?? null;
+          if (counterId) {
+            const counter = await tx.counter.findUnique({
+              where: { id: counterId },
+            });
+            assert(
+              counter?.serviceId === service.id,
+              422,
+              "INVALID_COUNTER",
+              "Choose a counter in this office.",
+            );
+            assert(
+              !input.canManageDescendants,
+              422,
+              "INVALID_SCOPE",
+              "Descendant inbox scope requires a whole-office assignment.",
+            );
+          }
+          assert(
+            !input.canManageDescendants || service.directoryGroup,
+            422,
+            "INVALID_SCOPE",
+            "Only a routing group can grant explicit descendant inbox access.",
+          );
+          const existing = await tx.staffAssignment.findFirst({
+            where: { userId: input.userId, serviceId: service.id, counterId },
+          });
+          const assignment = existing
+            ? await tx.staffAssignment.update({
+                where: { id: existing.id },
+                data: { canManageDescendants: input.canManageDescendants },
+              })
+            : await tx.staffAssignment.create({
+                data: {
+                  userId: input.userId,
+                  serviceId: service.id,
+                  counterId,
+                  canManageDescendants: input.canManageDescendants,
+                },
+              });
+          await tx.serviceEvent.create({
+            data: {
+              serviceId: service.id,
+              counterId,
+              eventType: "STAFF_ASSIGNED",
+              actorUserId: user.id,
+              metadata: {
+                assignedUserId: input.userId,
+                canManageDescendants: input.canManageDescendants,
+              },
+            },
+          });
+          return { id: assignment.id };
         });
       } else throw new AppError(404, "NOT_FOUND", "Endpoint not found.");
     } else throw new AppError(404, "NOT_FOUND", "Endpoint not found.");

@@ -38,3 +38,23 @@ These are one local sample, not a production SLO or a public-network API benchma
 The scenario assumes five office queues, five operator counters, one 40-join burst to one office, and 10 clients polling a five-office directory view per round. A service-row lock serializes mutations within a service, preserving FIFO. Independent services do not share that lock. For a real busy-hour target, agree on burst size, request rate, acceptable p95/p99, database connection limit and failure rate, then repeat the test on an isolated deployment that matches the target provider. Measure API latency, lock duration, errors, and database connections before making a capacity claim.
 
 The Prisma 7 `pg` adapter uses a PostgreSQL pool; the local run observed 10 connections, the default maximum documented by the [`pg` Pool API](https://node-postgres.com/apis/pool). With serverless instances, the potential aggregate is per-instance pool size multiplied by concurrently warm instances. Configure provider pooling (for example PgBouncer/serverless pool), Vercel function concurrency and connection limits together; a client-side singleton alone does not cap connections across serverless instances. See [Vercel connection pooling guidance](https://vercel.com/kb/guide/connection-pooling-with-functions) and [Prisma v7 connection pool settings](https://docs.prisma.io/docs/orm/v7/prisma-client/setup-and-configuration/databases-connections/connection-pool). No hosted provider or production pool has been load-tested here.
+
+## Meeting-request code verification sample — 2026-10-27
+
+A second isolated loopback run completed after the meeting-review model and handlers were added. It used the same guarded `_test` database and workload dimensions above.
+
+| Workload or metric                      |                            Observed result |
+| --------------------------------------- | -----------------------------------------: |
+| Simultaneous joins to one office        |                                         40 |
+| Join burst wall time                    |                                     934 ms |
+| Join latency, p50 / p95 / p99           |                         422 / 584 / 594 ms |
+| Join errors                             |                                          0 |
+| Five-office directory reads             |                                         50 |
+| Directory-read latency, p50 / p95 / p99 |                            50 / 63 / 64 ms |
+| Poll/read errors                        |                                          0 |
+| Maximum sampled PostgreSQL connections  |                                         10 |
+| Lock-wait samples                       |                                          7 |
+| Unique queue tokens and order sequences |                                    40 / 40 |
+| FIFO allocation                         | Passed; the next join received sequence 41 |
+
+This local sample includes the schema and query changes for meeting requests; it does not stress concurrent requests competing for an accepted meeting time. That path is covered by an integration race test, not by this load run. No production capacity claim is made.

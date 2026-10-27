@@ -71,6 +71,8 @@ test.beforeEach(async () => {
     data: {
       serviceType: "OFFICE",
       allowNote: true,
+      meetingRequestsEnabled: true,
+      meetingRequestReasonOptions: ["Housing question", "Policy clarification"],
       name: "Hostel Administration Office",
       slug: "hostel-office-test",
       prefix: "HOST",
@@ -369,6 +371,63 @@ test("assigned office officer pauses/resumes, sees private context, and complete
     (await db.ticket.findUniqueOrThrow({ where: { publicId } })).status,
   ).toBe("COMPLETED");
   await unassigned.close();
+  await officer.close();
+});
+test("student meeting request is private; assigned officer accepts and student sees it by polling", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(120_000);
+  await page.goto("/offices/hostel-office-test");
+  await expect(
+    page.getByRole("heading", { name: "Hostel Administration Office" }),
+  ).toBeVisible();
+  await page
+    .getByLabel("What would you like to discuss?")
+    .selectOption("Housing question");
+  await page
+    .getByLabel(/Brief context/)
+    .fill("Need guidance about residence access.");
+  await page.getByRole("button", { name: "Send request for review" }).click();
+  await expect(page).toHaveURL(/\/meeting-requests\//);
+  await expect(page.getByText("in the office review order")).toBeVisible();
+  await expect(
+    page.getByText("Need guidance about residence access."),
+  ).toBeVisible();
+  const publicId = page.url().split("/").at(-1)!;
+  const other = await browser.newContext({ baseURL: origin });
+  expect(
+    (await other.request.get(`/api/meeting-requests/${publicId}`)).status(),
+  ).toBe(404);
+  const publicState = await other.request.get(
+    `/api/services/${officeId}/public-state`,
+  );
+  const publicJson = await publicState.text();
+  expect(publicJson).not.toContain("Housing question");
+  expect(publicJson).not.toContain("Need guidance about residence access.");
+  expect(publicJson).not.toContain(publicId);
+
+  const officer = await browser.newContext({ baseURL: origin });
+  const op = await officer.newPage();
+  await signIn(op, "officer");
+  await op.goto("/staff/meetings");
+  await expect(
+    op.getByText("Need guidance about residence access."),
+  ).toBeVisible();
+  const date = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Karachi",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(Date.now() + 86400_000));
+  await op.getByLabel("Meeting time (Asia/Karachi)").fill(`${date}T14:00`);
+  await op.getByRole("button", { name: "Accept time" }).click();
+  await expect(op.getByText("Accepted:")).toBeVisible();
+  await expect(
+    page.getByText("Accepted by the office", { exact: true }).first(),
+  ).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText("Meeting time accepted by office")).toBeVisible();
+  await other.close();
   await officer.close();
 });
 test("private ownership, public allowlist, auth/assignment/CSRF/reset boundaries", async ({

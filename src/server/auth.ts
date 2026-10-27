@@ -90,6 +90,70 @@ export async function canManageService(userId: string, serviceId: string) {
     select: { id: true },
   }));
 }
+export async function canManageMeetingOffice(user: User, serviceId: string) {
+  if (user.role === "ADMIN") return true;
+  const [services, assignments] = await Promise.all([
+    db.service.findMany({ select: { id: true, parentServiceId: true } }),
+    db.staffAssignment.findMany({
+      where: { userId: user.id, counterId: null },
+      select: { serviceId: true, canManageDescendants: true },
+    }),
+  ]);
+  const parent = new Map(
+    services.map((service) => [service.id, service.parentServiceId]),
+  );
+  const assigned = new Map(
+    assignments.map((assignment) => [
+      assignment.serviceId,
+      assignment.canManageDescendants,
+    ]),
+  );
+  if (assigned.has(serviceId)) return true;
+  let cursor = parent.get(serviceId) ?? null;
+  const visited = new Set<string>();
+  while (cursor && !visited.has(cursor)) {
+    visited.add(cursor);
+    if (assigned.get(cursor) === true) return true;
+    cursor = parent.get(cursor) ?? null;
+  }
+  return false;
+}
+export async function meetingOfficeIds(user: User) {
+  const offices = await db.service.findMany({
+    where: { serviceType: "OFFICE", meetingRequestsEnabled: true },
+    select: { id: true, parentServiceId: true },
+  });
+  if (user.role === "ADMIN") return offices.map((office) => office.id);
+  const [services, assignments] = await Promise.all([
+    db.service.findMany({ select: { id: true, parentServiceId: true } }),
+    db.staffAssignment.findMany({
+      where: { userId: user.id, counterId: null },
+      select: { serviceId: true, canManageDescendants: true },
+    }),
+  ]);
+  const parent = new Map(
+    services.map((service) => [service.id, service.parentServiceId]),
+  );
+  const assigned = new Map(
+    assignments.map((assignment) => [
+      assignment.serviceId,
+      assignment.canManageDescendants,
+    ]),
+  );
+  return offices
+    .filter((office) => {
+      if (assigned.has(office.id)) return true;
+      let cursor = office.parentServiceId;
+      const visited = new Set<string>();
+      while (cursor && !visited.has(cursor)) {
+        visited.add(cursor);
+        if (assigned.get(cursor) === true) return true;
+        cursor = parent.get(cursor) ?? null;
+      }
+      return false;
+    })
+    .map((office) => office.id);
+}
 export async function visibleServiceScopes(user: User) {
   if (user.role === "ADMIN") {
     const services = await db.service.findMany({ select: { id: true } });

@@ -29,7 +29,28 @@ export async function seed() {
     throw new Error(
       "Set unique demo passwords of at least 12 characters in .env.",
     );
-  const fixtures = [
+  type Fixture = {
+    name: string;
+    slug: string;
+    prefix: string;
+    description: string;
+    location: string;
+    duration: number;
+    reasons: string[];
+    docs: string[];
+    serviceType: "DESK" | "OFFICE";
+    allowNote: boolean;
+    state: "OPEN" | "PAUSED" | "CLOSED";
+    pauseReason: string | null;
+    counters: number;
+    officerEmail: string | null;
+    gracePeriodSeconds: number;
+    positionTitle?: string;
+    officeSourceUrl?: string;
+    meetingRequestsEnabled?: boolean;
+    meetingRequestReasonOptions?: string[];
+  };
+  const fixtures: Fixture[] = [
     {
       name: "Student Affairs",
       slug: "student-affairs",
@@ -92,7 +113,7 @@ export async function seed() {
       gracePeriodSeconds: Number(process.env.DEMO_GRACE_SECONDS ?? 10),
     },
     {
-      name: "Cedar Hostel Office",
+      name: "Hostel Administration",
       slug: "cedar-hostel-office",
       prefix: "HOST",
       description:
@@ -108,9 +129,18 @@ export async function seed() {
       counters: 1,
       officerEmail: "hostel.officer@queuefair.demo",
       gracePeriodSeconds: Number(process.env.DEMO_OFFICE_GRACE_SECONDS ?? 30),
+      positionTitle: "Deputy Director Hostels",
+      officeSourceUrl:
+        "https://nust.edu.pk/about-us/resources-offices/field-administration-directorate/",
+      meetingRequestsEnabled: true,
+      meetingRequestReasonOptions: [
+        "Residence question",
+        "Facilities",
+        "General enquiry",
+      ],
     },
     {
-      name: "Campus Activities Office",
+      name: "Sports Directorate",
       slug: "campus-activities-office",
       prefix: "ACT",
       description:
@@ -126,7 +156,30 @@ export async function seed() {
       counters: 1,
       officerEmail: "sports.officer@queuefair.demo",
       gracePeriodSeconds: Number(process.env.DEMO_OFFICE_GRACE_SECONDS ?? 30),
+      positionTitle: "Deputy Director Sports",
+      officeSourceUrl:
+        "https://nust.edu.pk/about-us/resources-offices/field-administration-directorate/",
+      meetingRequestsEnabled: true,
+      meetingRequestReasonOptions: [
+        "Sports facilities",
+        "Team registration",
+        "Campus activity",
+      ],
     },
+  ];
+  const referenceSlugs = [
+    "field-administration-directorate",
+    "horticulture-office-reference",
+    "ncls-facilities-reference",
+    "medical-facilities-reference",
+    "pa-coordination-reference",
+    "student-affairs-directorate",
+    "finance-directorate",
+    "chief-finance-business-development",
+    "ict-directorate",
+    "academics-directorate",
+    "examinations-directorate",
+    "registrar-directorate",
   ];
   const [existingServices, existingUsers, existingTickets, existingDays] =
     await Promise.all([
@@ -139,7 +192,11 @@ export async function seed() {
     existingUsers > 0 ||
     existingTickets > 0 ||
     existingDays > 0 ||
-    existingServices.some((s) => !fixtures.some((f) => f.slug === s.slug))
+    existingServices.some(
+      (s) =>
+        !fixtures.some((f) => f.slug === s.slug) &&
+        !referenceSlugs.includes(s.slug),
+    )
   )
     throw new Error(
       "Database contains operational data. Seed refuses to overwrite it; use guarded demo:reset only for a disposable local demo database.",
@@ -182,6 +239,33 @@ export async function seed() {
     ["sports.officer@queuefair.demo", sportsOfficer],
   ]);
   const now = new Date();
+  const fieldAdmin = await db.service.create({
+    data: {
+      serviceType: "OFFICE",
+      directoryGroup: true,
+      name: "Field Administration Directorate",
+      slug: "field-administration-directorate",
+      prefix: "FAD",
+      description:
+        "Publicly listed remit includes hostels, sports, horticulture, NCLS and medical facilities. This parent-child routing is inferred for the prototype only.",
+      positionTitle: "Director, Field Administration",
+      location: "Routing group · no QueueFair counter",
+      state: "CLOSED",
+      pauseReason:
+        "Routing group only; no meeting or walk-in queue is configured.",
+      notice:
+        "Independent prototype routing reference. No organizational access is implied.",
+      officeSourceUrl:
+        "https://nust.edu.pk/about-us/resources-offices/field-administration-directorate/",
+      weeklyHours: { days: [1, 2, 3, 4, 5], open: "09:00", close: "17:00" },
+      defaultServiceSeconds: 1200,
+      gracePeriodSeconds: 120,
+      maxWaitingTickets: 100,
+      documentRequirements: [],
+      visitReasonOptions: ["Routing enquiry"],
+      meetingRequestReasonOptions: [],
+    },
+  });
   for (const f of fixtures) {
     const s = await db.service.upsert({
       where: { slug: f.slug },
@@ -189,6 +273,20 @@ export async function seed() {
       create: {
         serviceType: f.serviceType,
         allowNote: f.allowNote,
+        parentServiceId:
+          f.slug === "cedar-hostel-office" ||
+          f.slug === "campus-activities-office"
+            ? fieldAdmin.id
+            : null,
+        positionTitle: f.positionTitle ?? null,
+        officeSourceUrl: f.officeSourceUrl ?? null,
+        meetingRequestsEnabled: f.meetingRequestsEnabled ?? false,
+        meetingDurationMinutes: 20,
+        meetingBookingHorizonDays: 30,
+        meetingCancellationCutoffMinutes: 60,
+        meetingDailyCapacity: 8,
+        meetingRequestReasonOptions: f.meetingRequestReasonOptions ?? [],
+        directoryGroup: false,
         name: f.name,
         slug: f.slug,
         prefix: f.prefix,
@@ -202,11 +300,10 @@ export async function seed() {
           f.serviceType === "OFFICE"
             ? "Same-day walk-in line · not an appointment. Estimates can change while the office is in a meeting."
             : "Demo data · synthetic queue history.",
-        weeklyHours: {
-          days: [0, 1, 2, 3, 4, 5, 6],
-          open: "00:00",
-          close: "23:59",
-        },
+        weeklyHours:
+          f.serviceType === "OFFICE"
+            ? { days: [1, 2, 3, 4, 5], open: "09:00", close: "17:00" }
+            : { days: [0, 1, 2, 3, 4, 5, 6], open: "00:00", close: "23:59" },
         documentRequirements: f.docs,
         visitReasonOptions: f.reasons,
       },
@@ -403,8 +500,143 @@ export async function seed() {
         });
     }
   }
+  const referenceOffice = async (input: {
+    name: string;
+    slug: string;
+    prefix: string;
+    description: string;
+    positionTitle?: string;
+    parentServiceId?: string;
+    sourceUrl: string;
+  }) =>
+    db.service.create({
+      data: {
+        serviceType: "OFFICE",
+        directoryGroup: false,
+        name: input.name,
+        slug: input.slug,
+        prefix: input.prefix,
+        description: input.description,
+        location: "Public-directory reference · verify locally",
+        state: "CLOSED",
+        pauseReason:
+          "Reference entry only; this QueueFair demo has no configured office queue.",
+        notice:
+          "Independent prototype · public directory entry is a routing reference only.",
+        parentServiceId: input.parentServiceId ?? null,
+        positionTitle: input.positionTitle ?? null,
+        officeSourceUrl: input.sourceUrl,
+        meetingRequestsEnabled: false,
+        meetingDurationMinutes: 20,
+        meetingBookingHorizonDays: 30,
+        meetingCancellationCutoffMinutes: 60,
+        meetingDailyCapacity: 8,
+        meetingRequestReasonOptions: [],
+        allowNote: false,
+        weeklyHours: { days: [1, 2, 3, 4, 5], open: "09:00", close: "17:00" },
+        defaultServiceSeconds: 1200,
+        gracePeriodSeconds: 120,
+        maxWaitingTickets: 100,
+        documentRequirements: [],
+        visitReasonOptions: ["General enquiry"],
+      },
+    });
+  const fadSource =
+    "https://nust.edu.pk/about-us/resources-offices/field-administration-directorate/";
+  const directorySource = "https://nust.edu.pk/about-us/resources-offices/";
+  await Promise.all([
+    referenceOffice({
+      name: "PA / coordination route",
+      slug: "pa-coordination-reference",
+      prefix: "PA",
+      positionTitle: "PA to Director Field Administration",
+      description:
+        "Routing and triage reference; access requires an explicit assignment.",
+      parentServiceId: fieldAdmin.id,
+      sourceUrl: fadSource,
+    }),
+    referenceOffice({
+      name: "Horticulture Office",
+      slug: "horticulture-office-reference",
+      prefix: "HORT",
+      positionTitle: "Senior Deputy Director Horticulture",
+      description:
+        "Role title appears in the public Field Administration directory. No QueueFair inbox is configured.",
+      parentServiceId: fieldAdmin.id,
+      sourceUrl: fadSource,
+    }),
+    referenceOffice({
+      name: "NCLS Facilities",
+      slug: "ncls-facilities-reference",
+      prefix: "NCLS",
+      description:
+        "Configurable example from the public remit. Verify an appropriate office contact before enabling requests.",
+      parentServiceId: fieldAdmin.id,
+      sourceUrl: fadSource,
+    }),
+    referenceOffice({
+      name: "Medical Facilities",
+      slug: "medical-facilities-reference",
+      prefix: "MED",
+      description:
+        "Configurable example from the public remit. Verify an appropriate office contact before enabling requests.",
+      parentServiceId: fieldAdmin.id,
+      sourceUrl: fadSource,
+    }),
+    referenceOffice({
+      name: "Student Affairs Directorate",
+      slug: "student-affairs-directorate",
+      prefix: "SAO",
+      description:
+        "Listed separately in the public Resources & Offices directory.",
+      sourceUrl: "https://sa.nust.edu.pk/",
+    }),
+    referenceOffice({
+      name: "Finance Directorate",
+      slug: "finance-directorate",
+      prefix: "FD",
+      description: "Listed in the public Resources & Offices directory.",
+      sourceUrl: directorySource,
+    }),
+    referenceOffice({
+      name: "Chief of Finance & Business Development Office",
+      slug: "chief-finance-business-development",
+      prefix: "FBD",
+      description:
+        "Listed separately in the public Resources & Offices directory.",
+      sourceUrl: directorySource,
+    }),
+    referenceOffice({
+      name: "ICT Directorate",
+      slug: "ict-directorate",
+      prefix: "ICT",
+      description: "Listed in the public Resources & Offices directory.",
+      sourceUrl: directorySource,
+    }),
+    referenceOffice({
+      name: "Academics Directorate",
+      slug: "academics-directorate",
+      prefix: "ACAD",
+      description: "Listed in the public Resources & Offices directory.",
+      sourceUrl: directorySource,
+    }),
+    referenceOffice({
+      name: "Examinations Directorate",
+      slug: "examinations-directorate",
+      prefix: "EXAM",
+      description: "Listed in the public Resources & Offices directory.",
+      sourceUrl: directorySource,
+    }),
+    referenceOffice({
+      name: "Registrar Directorate",
+      slug: "registrar-directorate",
+      prefix: "REG",
+      description: "Listed in the public Resources & Offices directory.",
+      sourceUrl: directorySource,
+    }),
+  ]);
   console.log(
-    "Seeded fictional campus desks and same-day office queues with synthetic ticket history. Credentials were read from the environment.",
+    "Seeded fictional desks, separate office walk-in and meeting-request demos, and public-directory routing references. Credentials were read from the environment.",
   );
 }
 if (process.argv[1]?.endsWith("seed.ts"))

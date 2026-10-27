@@ -102,3 +102,26 @@
 
 Load check is a small loopback exercise only: 40 concurrent joins and 50 multi-office directory reads. It does not substantiate a 15,000-concurrent-user claim.
 Read-only hosted check on 2026-10-27: `https://queuefair.vercel.app/api/services` returned HTTP 200 with three OPEN desk services and zero waiting tickets; it has no office services in the current catalog. This does not verify hosted staff credentials or queue transitions, and the local office changes have not been deployed.
+
+## Scheduled office meeting requests — 2026-10-27
+
+- [ ] Extend existing office request schema with per-office/day review sequence and validated booking policy; add migration, partial active-owner constraint, and bounded conflict checks.
+- [ ] Implement anonymous request create/read/cancel, assigned-officer inbox/decision endpoints, proposal student responses, event history, idempotency, and explicit hierarchy authorization.
+- [ ] Seed verified public-directory role titles as reference-only taxonomy, without real employee contacts or institutional branding; display required disclaimer/source links on every relevant page.
+- [ ] Build `/offices`, office detail request flow, `/my-meetings`, private request timeline, and `/staff/meetings` inbox while preserving the separate walk-in queue.
+- [ ] Add unit/database/browser tests for request replay, authorization, queue order, scheduling validation/conflicts, proposal lifecycle, cancellation, and privacy.
+- [ ] Run checks and update documentation. No hosted database write, deploy, or publication is authorized.
+
+## Scheduled office meeting requests — 2026-10-27
+
+- [x] Keep office-reviewed meeting requests separate from same-day FIFO walk-in tickets.
+- [x] Add private owner capability, stable office/day review references, request events, persisted idempotency, office assignment and explicit descendant authorization.
+- [x] Add request, accept, reject, propose, student response, cancel, and completion lifecycle with office-hours, horizon, capacity, cancellation-cutoff, and slot-conflict validation.
+- [x] Add fictional, source-attributed office routing directory and NUST independent-prototype disclaimer; hierarchy is navigation only.
+- [x] Build student directory/detail/request pages, `/my-meetings`, private request detail, and assigned officer inbox; preserve public DTO privacy.
+- [x] Verify unit, integration, browser, load, lint, typecheck, formatting, and production build; verify office layout widths against production server.
+- [x] Update demo/API/architecture/decision/load/verification docs. Local guarded demo reset completed after tests.
+
+- Local verification on 2026-10-27: 67 unit tests, 20 isolated PostgreSQL integration tests, 13 Playwright scenarios, and the 40-join/50-poll isolated workload passed. Lint, strict typecheck, format check, and production build passed. Production-mode office directory/detail passed horizontal-overflow measurements at 375, 768, 1366, and 1440px; the office wall display passed at 1920px.
+- No hosted database migration, staff provisioning, production seed, deployment, remote CI, or AWS integration was performed. The public URL has not been verified for the new meeting-request workflow. See `docs/VERIFICATION.md` for the actual local results and remaining hosted setup.
+- Follow-up: broad Urdu coverage for the new meeting-request workflow and full production provisioning rehearsal remain outstanding. The office request form currently uses English copy inside RTL layouts when Urdu is selected.

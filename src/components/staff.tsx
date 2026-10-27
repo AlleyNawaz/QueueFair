@@ -7,6 +7,7 @@ import {
   Activity,
   ArrowLeft,
   ArrowRight,
+  CalendarClock,
   LayoutDashboard,
   LogOut,
   Monitor,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 import type { StaffOverview } from "@/server/reads";
 import { api, Badge, Empty, ErrorBox, Loading, Sync, useLive } from "./shared";
+import { ReferenceDisclaimer } from "./office-meetings";
 export function Login() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -124,6 +126,9 @@ export function StaffShell({
         <Link href="/staff">
           <Monitor size={18} /> Counter workspace
         </Link>
+        <Link href="/staff/meetings">
+          <CalendarClock size={18} /> Meeting inbox
+        </Link>
         <Link href="/">
           <ArrowLeft size={18} /> Student services
         </Link>
@@ -195,6 +200,11 @@ export function Staff({ counterId }: { counterId?: string }) {
             </div>
             <Badge state={d.user.role} />
           </div>
+          {d.services.some((item) =>
+            item.officeSourceUrl?.includes("nust.edu.pk"),
+          ) && (
+            <ReferenceDisclaimer text="Independent QueueFair prototype. NUST’s public directory is used only as a routing reference; this is not an official NUST service and does not confirm officer availability." />
+          )}
           <div className="stack">
             {d.services.map((s) => (
               <section key={s.id} className="panel">
@@ -254,6 +264,9 @@ export function Staff({ counterId }: { counterId?: string }) {
           <Link className="back-link" href="/staff">
             <ArrowLeft size={16} /> All assigned counters
           </Link>
+          {service.officeSourceUrl?.includes("nust.edu.pk") && (
+            <ReferenceDisclaimer text="Independent QueueFair prototype. NUST’s public directory is used only as a routing reference; this is not an official NUST service and does not confirm officer availability." />
+          )}
           <div className="page-heading">
             <div>
               <span className="eyebrow">{service.name}</span>

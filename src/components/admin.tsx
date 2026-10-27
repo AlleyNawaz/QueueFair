@@ -8,6 +8,7 @@ import type { serviceSchema } from "@/lib/contracts";
 import type { PublicService } from "@/server/reads";
 import { api, Badge, Empty, ErrorBox, Loading, Sync, useLive } from "./shared";
 import { StaffShell } from "./staff";
+import { ReferenceDisclaimer } from "./office-meetings";
 type Settings = z.infer<typeof serviceSchema>;
 type AdminService = Settings & {
   id: string;
@@ -28,6 +29,16 @@ type Analytics = {
 const defaultSettings: Settings = {
   serviceType: "DESK",
   allowNote: true,
+  directoryGroup: false,
+  parentServiceId: null,
+  positionTitle: null,
+  officeSourceUrl: null,
+  meetingRequestsEnabled: false,
+  meetingDurationMinutes: 20,
+  meetingBookingHorizonDays: 30,
+  meetingCancellationCutoffMinutes: 60,
+  meetingDailyCapacity: 8,
+  meetingRequestReasonOptions: [],
   name: "",
   slug: "",
   description: "",
@@ -124,6 +135,11 @@ export function ManageServices({ serviceId }: { serviceId?: string }) {
         </button>
       </div>
       <ErrorBox error={q.error} />
+      {q.data?.some((service) =>
+        service.officeSourceUrl?.includes("nust.edu.pk"),
+      ) && (
+        <ReferenceDisclaimer text="Independent QueueFair prototype. NUST’s public directory is used only as a routing reference; this is not an official NUST service and does not confirm officer availability." />
+      )}
       {!q.data ? (
         <Loading />
       ) : create ? (
@@ -166,6 +182,7 @@ function ServiceEditor({ service }: { service: AdminService }) {
   );
   const [name, setName] = useState("");
   const [staff, setStaff] = useState("");
+  const [descendants, setDescendants] = useState(false);
   const client = useQueryClient();
   const create = useMutation({
     mutationFn: () =>
@@ -182,6 +199,16 @@ function ServiceEditor({ service }: { service: AdminService }) {
   const assign = useMutation({
     mutationFn: (counterId: string) =>
       api(`admin/counters/${counterId}`, { staffUserId: staff }, "PATCH"),
+    onSuccess: () => client.invalidateQueries(),
+  });
+  const assignOffice = useMutation({
+    mutationFn: () =>
+      api("admin/assignments", {
+        serviceId: service.id,
+        userId: staff,
+        counterId: null,
+        canManageDescendants: descendants,
+      }),
     onSuccess: () => client.invalidateQueries(),
   });
   return (
@@ -217,6 +244,28 @@ function ServiceEditor({ service }: { service: AdminService }) {
             ))}
           </select>
         </label>
+        {service.serviceType === "OFFICE" && (
+          <div className="office-assignment">
+            <button
+              className="button outline"
+              disabled={!staff || assignOffice.isPending}
+              onClick={() => assignOffice.mutate()}
+            >
+              Assign selected staff to this office inbox
+            </button>
+            {service.directoryGroup && (
+              <label className="inline-checkbox">
+                <input
+                  type="checkbox"
+                  checked={descendants}
+                  onChange={(event) => setDescendants(event.target.checked)}
+                />
+                Grant inbox access to child offices explicitly
+              </label>
+            )}
+            <ErrorBox error={assignOffice.error} />
+          </div>
+        )}
         <ErrorBox error={assign.error} />
         <form
           onSubmit={(e) => {
@@ -244,6 +293,7 @@ function ServiceEditor({ service }: { service: AdminService }) {
   );
 }
 function ServiceForm({ initial, id }: { initial: Settings; id?: string }) {
+  const services = useLive<AdminService[]>("admin/services", 30000);
   const [form, setForm] = useState<Settings>(
     () =>
       Object.fromEntries(
@@ -276,6 +326,9 @@ function ServiceForm({ initial, id }: { initial: Settings; id?: string }) {
       }}
     >
       <h2>{id ? `Settings · ${initial.name}` : "Create a service"}</h2>
+      {form.officeSourceUrl?.includes("nust.edu.pk") && (
+        <ReferenceDisclaimer text="Independent QueueFair prototype. NUST’s public directory is used only as a routing reference; this is not an official NUST service and does not confirm officer availability." />
+      )}
       <div className="form-grid">
         <label>
           Queue type
@@ -300,6 +353,106 @@ function ServiceForm({ initial, id }: { initial: Settings; id?: string }) {
           </label>
         ))}
       </div>
+      <section className="office-settings">
+        <h3>Office directory & meeting requests</h3>
+        <p className="muted">
+          Routing groups organize navigation only. They grant inbox access only
+          when an administrator explicitly assigns descendant scope.
+        </p>
+        <label className="inline-checkbox">
+          <input
+            type="checkbox"
+            checked={form.directoryGroup}
+            onChange={(e) => field("directoryGroup", e.target.checked)}
+          />
+          This is a directory routing group, not an appointment destination
+        </label>
+        <div className="form-grid">
+          <label>
+            Parent office
+            <select
+              value={form.parentServiceId ?? ""}
+              onChange={(e) => field("parentServiceId", e.target.value || null)}
+            >
+              <option value="">Top-level directory entry</option>
+              {services.data
+                ?.filter(
+                  (candidate) =>
+                    candidate.id !== id && candidate.serviceType === "OFFICE",
+                )
+                .map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label>
+            Public role title
+            <input
+              maxLength={120}
+              value={form.positionTitle ?? ""}
+              onChange={(e) => field("positionTitle", e.target.value || null)}
+            />
+          </label>
+          <label>
+            Public source URL
+            <input
+              type="url"
+              value={form.officeSourceUrl ?? ""}
+              onChange={(e) => field("officeSourceUrl", e.target.value || null)}
+            />
+          </label>
+        </div>
+        <label className="inline-checkbox">
+          <input
+            type="checkbox"
+            checked={form.meetingRequestsEnabled}
+            onChange={(e) => field("meetingRequestsEnabled", e.target.checked)}
+          />
+          Accept anonymous meeting requests for this office
+        </label>
+        {form.meetingRequestsEnabled && (
+          <>
+            <div className="form-grid">
+              {(
+                [
+                  ["meetingDurationMinutes", "Meeting duration (minutes)"],
+                  ["meetingBookingHorizonDays", "Booking horizon (days)"],
+                  [
+                    "meetingCancellationCutoffMinutes",
+                    "Cancellation cutoff (minutes)",
+                  ],
+                  ["meetingDailyCapacity", "Meeting capacity per office day"],
+                ] as const
+              ).map(([key, label]) => (
+                <label key={key}>
+                  {label}
+                  <input
+                    type="number"
+                    required
+                    value={form[key]}
+                    onChange={(e) => field(key, Number(e.target.value))}
+                  />
+                </label>
+              ))}
+            </div>
+            <label>
+              Meeting topics (one per line)
+              <textarea
+                required
+                value={form.meetingRequestReasonOptions.join("\n")}
+                onChange={(e) =>
+                  field(
+                    "meetingRequestReasonOptions",
+                    e.target.value.split("\n"),
+                  )
+                }
+              />
+            </label>
+          </>
+        )}
+      </section>
       <label>
         Description
         <textarea
