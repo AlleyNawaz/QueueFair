@@ -74,6 +74,8 @@ export function ServiceView({ slug }: { slug: string }) {
         <Link href="/">Return to services</Link>
       </main>
     );
+  const queueFull = s.waitingCount >= s.maxWaitingTickets;
+  const canJoin = s.joiningOpen && !queueFull;
   return (
     <main className="page" dir={ur ? "rtl" : "ltr"}>
       <Link href="/" className="back-link">
@@ -99,7 +101,7 @@ export function ServiceView({ slug }: { slug: string }) {
           <div className="panel">
             <div className="section-heading">
               <h2>{t.queueNow}</h2>
-              <span className="live-dot">Polling live</span>
+              <span className="live-dot">Near-real-time polling</span>
             </div>
             <div className="large-metrics">
               <div>
@@ -109,14 +111,29 @@ export function ServiceView({ slug }: { slug: string }) {
               </div>
               <div>
                 <Clock3 size={20} />
-                <strong>{s.estimate.label}</strong>
-                <span>{s.estimate.source}</span>
+                <strong>
+                  {s.waitingCount === 0 ? "No one waiting" : s.estimate.label}
+                </strong>
+                <span>
+                  {s.waitingCount === 0
+                    ? s.joiningOpen
+                      ? "Joining is open"
+                      : s.state === "PAUSED"
+                        ? "Joining is paused"
+                        : "Joining is closed"
+                    : s.estimate.source}
+                </span>
               </div>
             </div>
             <p>
-              {s.counters.filter((c) => c.state === "ACTIVE").length} active
-              counters · Today, {s.weeklyHours.open}–{s.weeklyHours.close} PKT
+              {s.counters.filter((c) => c.state === "ACTIVE").length} of{" "}
+              {s.counters.length} counters set active · Today,{" "}
+              {s.weeklyHours.open}–{s.weeklyHours.close} PKT
             </p>
+            <small className="counter-state-note">
+              Counter state is configuration only; it does not confirm an
+              operator is present.
+            </small>
             {(s.pauseReason || s.notice) && (
               <div className="notice">
                 {s.pauseReason} {s.notice}
@@ -154,6 +171,16 @@ export function ServiceView({ slug }: { slug: string }) {
             <span className="eyebrow">SAVE YOUR PLACE</span>
             <h2>{t.joinQueue}</h2>
             <p>{t.noAccount}</p>
+            {s.serviceType === "OFFICE" && (
+              <div className="office-queue-explainer">
+                <strong>Same-day walk-in line · not an appointment</strong>
+                <p>
+                  Joining does not guarantee a meeting time. Estimates may
+                  change while the office is in a meeting. Stay nearby and go to
+                  the office only after your ticket is called.
+                </p>
+              </div>
+            )}
             <label>
               {t.reason}
               <select
@@ -168,19 +195,23 @@ export function ServiceView({ slug }: { slug: string }) {
                 ))}
               </select>
             </label>
-            <label>
-              {t.optionalNote} <span className="muted">(optional)</span>
-              <textarea
-                maxLength={240}
-                value={note}
-                onChange={(e) => {
-                  setNote(e.target.value);
-                  key.current = null;
-                }}
-                placeholder="Keep it brief. Avoid personal information."
-              />
-              <small>{note.length}/240 · Visible only to this browser</small>
-            </label>
+            {s.allowNote && (
+              <label>
+                {t.optionalNote} <span className="muted">(optional)</span>
+                <textarea
+                  maxLength={240}
+                  value={note}
+                  onChange={(e) => {
+                    setNote(e.target.value);
+                    key.current = null;
+                  }}
+                  placeholder="Keep it brief. Do not include sensitive information."
+                />
+                <small>
+                  {note.length}/240 · Visible only to you and authorized staff
+                </small>
+              </label>
+            )}
             <div className="ownership">
               <LockKeyhole size={18} />
               <p>
@@ -199,15 +230,17 @@ export function ServiceView({ slug }: { slug: string }) {
             ) : (
               <button
                 className="button full"
-                disabled={!s.joiningOpen || join.isPending || !!q.error}
+                disabled={!canJoin || join.isPending || !!q.error}
               >
                 {join.isPending
                   ? "Saving your place…"
-                  : s.joiningOpen
-                    ? ur
-                      ? "میرا ٹکٹ حاصل کریں"
-                      : "Get my ticket"
-                    : "Joining currently unavailable"}
+                  : queueFull
+                    ? "Queue is full"
+                    : s.joiningOpen
+                      ? ur
+                        ? "میرا ٹکٹ حاصل کریں"
+                        : "Get my ticket"
+                      : "Joining currently unavailable"}
                 <ArrowRight size={17} />
               </button>
             )}
@@ -292,10 +325,15 @@ export function TicketView({ publicId }: { publicId: string }) {
           >
             {t.status === "CALLED" ? (
               <>
-                <strong>Please go to {t.counter?.name}.</strong>
+                <strong>
+                  {t.service.serviceType === "OFFICE"
+                    ? `Please go to ${t.service.name} · ${t.service.location} now.`
+                    : `Please go to ${t.counter?.name}.`}
+                </strong>
                 <p>
-                  Your turn is here. Staff will start your visit when you
-                  arrive.
+                  {t.service.serviceType === "OFFICE"
+                    ? `Your call window is ${t.service.gracePeriodSeconds} seconds from ${t.calledAt ? new Date(t.calledAt).toLocaleTimeString("en-PK", { hour: "2-digit", minute: "2-digit", timeZone: t.service.timezone }) : "now"} PKT. The officer will mark a missed turn only after this window.`
+                    : "Your turn is here. Staff will start your visit when you arrive."}
                 </p>
               </>
             ) : t.status === "SERVING" ? (
@@ -344,8 +382,26 @@ export function TicketView({ publicId }: { publicId: string }) {
               <EstimatePanel estimate={t.estimate} />
             </>
           )}
+          {t.service.serviceType === "OFFICE" && (
+            <p className="office-queue-explainer">
+              This is a same-day walk-in line, not an appointment or guaranteed
+              meeting time. Wait for your ticket to be called before going to
+              the office. If plans change, you can cancel while waiting or after
+              being called.
+            </p>
+          )}
           {t.service.pauseReason && (
             <p className="notice">{t.service.pauseReason}</p>
+          )}
+          {(t.visitReasonCode || t.note) && (
+            <div className="ticket-private-details">
+              <h2>Your visit details</h2>
+              {t.visitReasonCode && <p>Reason: {t.visitReasonCode}</p>}
+              {t.note && <p>Your note: {t.note}</p>}
+              <small>
+                These details are private to you and assigned staff.
+              </small>
+            </div>
           )}
           <Sync error={q.error} at={t.syncedAt} />
           <ErrorBox error={action.error} />
@@ -571,7 +627,12 @@ export function Display({ slug }: { slug: string }) {
             <div className="display-token" dir="ltr">
               {c.current?.tokenLabel ?? "—"}
             </div>
-            <Badge state={c.current?.status ?? c.state} />
+            <Badge
+              state={
+                c.current?.status ??
+                (c.state === "ACTIVE" ? "CONFIGURED ACTIVE" : c.state)
+              }
+            />
             {c.pauseReason && <p>{c.pauseReason}</p>}
           </article>
         ))}
@@ -587,7 +648,9 @@ export function Display({ slug }: { slug: string }) {
             )}
           </div>
           <p>
-            {s.waitingCount} people waiting · {s.estimate.label}
+            {s.waitingCount === 0
+              ? `No one waiting · Joining is ${s.joiningOpen ? "open" : s.state.toLowerCase()}`
+              : `${s.waitingCount} people waiting · ${s.estimate.label}`}
           </p>
         </div>
         <div className="qr-block">

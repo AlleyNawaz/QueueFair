@@ -7,6 +7,7 @@ import {
   rolloverService,
   locked,
   updateService,
+  officeCommand,
 } from "../../src/server/queue";
 import { publicState, privateTicket } from "../../src/server/reads";
 import { randomUUID } from "node:crypto";
@@ -15,6 +16,7 @@ let sid: string;
 let staff: string;
 let c1: string;
 let c2: string;
+let officeId: string;
 beforeAll(() => {
   const url = new URL(process.env.DATABASE_URL!);
   if (
@@ -65,6 +67,28 @@ beforeEach(async () => {
       data: { serviceId: sid, name: "Counter 2", state: "ACTIVE" },
     })
   ).id;
+  const office = await db.service.create({
+    data: {
+      serviceType: "OFFICE",
+      slug: "test-office",
+      name: "Test Office",
+      prefix: "OFF",
+      description: "Office for same-day walk-in queue integration tests",
+      location: "Test building",
+      weeklyHours: {
+        days: [0, 1, 2, 3, 4, 5, 6],
+        open: "00:00",
+        close: "23:59",
+      },
+      visitReasonOptions: ["Meeting"],
+      documentRequirements: [],
+      allowNote: true,
+    },
+  });
+  officeId = office.id;
+  await db.staffAssignment.create({
+    data: { userId: staff, serviceId: officeId },
+  });
 });
 afterAll(() => db.$disconnect());
 async function owner() {
@@ -290,4 +314,72 @@ it("paused/closed and hours block joins/calls without losing ordering", async ()
   await expect(add()).rejects.toMatchObject({ code: "SERVICE_CLOSED" });
   await expect(call()).rejects.toMatchObject({ code: "SERVICE_CLOSED" });
   expect(await db.ticket.count({ where: { status: "WAITING" } })).toBe(1);
+});
+it("office meeting pause preserves FIFO, blocks joins/calls, and resumes the same line", async () => {
+  await db.service.update({
+    where: { id: sid },
+    data: { serviceType: "OFFICE" },
+  });
+  const firstOwner = await owner();
+  const first = await join(
+    sid,
+    firstOwner,
+    { reason: "Help" },
+    randomUUID(),
+    now,
+  );
+  const firstTicket = await db.ticket.findUniqueOrThrow({
+    where: { publicId: first.publicId },
+  });
+  await officeCommand(sid, staff, "pause", "Officer in a meeting", now);
+  await expect(add()).rejects.toMatchObject({ code: "SERVICE_CLOSED" });
+  await expect(call()).rejects.toMatchObject({ code: "SERVICE_CLOSED" });
+  expect((await publicState(sid, now)).dto.pauseReason).toBe(
+    "Officer in a meeting",
+  );
+  expect(
+    (await db.ticket.findUniqueOrThrow({ where: { id: firstTicket.id } }))
+      .status,
+  ).toBe("WAITING");
+  await officeCommand(sid, staff, "resume", undefined, now);
+  const second = await add();
+  const secondTicket = await db.ticket.findUniqueOrThrow({
+    where: { publicId: second.publicId },
+  });
+  expect(secondTicket.queueSequence).toBeGreaterThan(firstTicket.queueSequence);
+  const called = await call();
+  expect((called as { ticketId: string }).ticketId).toBe(firstTicket.id);
+});
+it("office notes require explicit service configuration and never enter public DTOs", async () => {
+  await db.service.update({
+    where: { id: sid },
+    data: { serviceType: "OFFICE", allowNote: false },
+  });
+  await expect(
+    join(
+      sid,
+      await owner(),
+      { reason: "Help", note: "private detail" },
+      randomUUID(),
+      now,
+    ),
+  ).rejects.toMatchObject({ code: "NOTE_DISABLED" });
+  await db.service.update({ where: { id: sid }, data: { allowNote: true } });
+  const t = await join(
+    sid,
+    await owner(),
+    { reason: "Help", note: "private detail" },
+    randomUUID(),
+    now,
+  );
+  const stored = await db.ticket.findUniqueOrThrow({
+    where: { publicId: t.publicId },
+  });
+  expect(
+    (await privateTicket(t.publicId, stored.anonymousSessionId)).note,
+  ).toBe("private detail");
+  const publicJson = JSON.stringify((await publicState(sid, now)).dto);
+  expect(publicJson).not.toContain("private detail");
+  expect(publicJson).not.toContain('"visitReasonCode"');
+  expect(publicJson).not.toContain('"note"');
 });

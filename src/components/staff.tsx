@@ -208,6 +208,9 @@ export function Staff({ counterId }: { counterId?: string }) {
                   <Badge state={s.state} />
                 </div>
                 {s.pauseReason && <p className="notice">{s.pauseReason}</p>}
+                {s.serviceType === "OFFICE" && (
+                  <OfficeAvailability service={s} />
+                )}
                 <div className="counter-grid">
                   {s.counters.map((c) => (
                     <Link
@@ -267,6 +270,9 @@ export function Staff({ counterId }: { counterId?: string }) {
               visits can finish.
             </div>
           )}
+          {service.serviceType === "OFFICE" && (
+            <OfficeAvailability service={service} />
+          )}
           <ErrorBox error={mutation.error} />
           <div className="operator-layout">
             <section className="stack">
@@ -278,6 +284,16 @@ export function Staff({ counterId }: { counterId?: string }) {
                       {counter.work.tokenLabel}
                     </div>
                     <Badge state={counter.work.status} />
+                    {(counter.work.visitReasonCode || counter.work.note) && (
+                      <div className="office-private-details">
+                        {counter.work.visitReasonCode && (
+                          <p>Visit reason: {counter.work.visitReasonCode}</p>
+                        )}
+                        {counter.work.note && (
+                          <p>Student note: {counter.work.note}</p>
+                        )}
+                      </div>
+                    )}
                     <p>
                       Elapsed{" "}
                       {Math.max(
@@ -489,6 +505,12 @@ export function Staff({ counterId }: { counterId?: string }) {
                           )}{" "}
                           min waiting {t.rejoinCount > 0 ? "· Rejoined" : ""}
                         </small>
+                        {(t.visitReasonCode || t.note) && (
+                          <small className="office-private-details">
+                            {t.visitReasonCode}
+                            {t.note ? ` · ${t.note}` : ""}
+                          </small>
+                        )}
                       </div>
                     </li>
                   ))}
@@ -502,5 +524,78 @@ export function Staff({ counterId }: { counterId?: string }) {
       )}
       <Sync error={q.error} at={d.syncedAt} />
     </StaffShell>
+  );
+}
+
+function OfficeAvailability({
+  service,
+}: {
+  service: StaffOverview["services"][number];
+}) {
+  const client = useQueryClient();
+  const [reason, setReason] = useState(
+    service.pauseReason || "In a meeting; existing queue order is preserved.",
+  );
+  const action =
+    service.state === "PAUSED"
+      ? "resume"
+      : service.state === "OPEN"
+        ? "pause"
+        : null;
+  const mutation = useMutation({
+    mutationFn: () =>
+      api(
+        `staff/services/${service.id}/${action}`,
+        action === "pause" ? { reason } : {},
+      ),
+    onSuccess: () => client.invalidateQueries(),
+  });
+  return (
+    <div className="office-availability">
+      <div>
+        <strong>
+          {service.state === "PAUSED"
+            ? "Office line paused"
+            : "Office line accepting walk-ins"}
+        </strong>
+        <p>
+          {service.waitingCount} waiting · the FIFO order is preserved when the
+          line pauses.
+        </p>
+      </div>
+      {action === "pause" && (
+        <label>
+          Public-safe meeting notice
+          <input
+            maxLength={160}
+            minLength={3}
+            required
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </label>
+      )}
+      {action ? (
+        <>
+          <ErrorBox error={mutation.error} />
+          <button
+            className={action === "pause" ? "button outline" : "button"}
+            disabled={
+              mutation.isPending ||
+              (action === "pause" && reason.trim().length < 3)
+            }
+            onClick={() => mutation.mutate()}
+          >
+            {mutation.isPending
+              ? "Updating office line…"
+              : action === "pause"
+                ? "In a meeting — pause new joins and calls"
+                : "Resume office walk-in line"}
+          </button>
+        </>
+      ) : (
+        <p>Closed by an administrator. Ask them to reopen walk-ins.</p>
+      )}
+    </div>
   );
 }

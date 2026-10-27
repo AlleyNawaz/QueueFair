@@ -106,7 +106,7 @@ async function day(tx: Tx, s: Service, now: Date) {
     update: {},
   });
 }
-async function idempotent<T extends Prisma.InputJsonValue>(
+export async function idempotent<T extends Prisma.InputJsonValue>(
   tx: Tx,
   actor: string,
   operation: string,
@@ -179,6 +179,12 @@ export async function join(
         422,
         "INVALID_REASON",
         "Choose a listed visit reason.",
+      );
+      assert(
+        s.allowNote || !input.note,
+        422,
+        "NOTE_DISABLED",
+        "This service does not accept an optional note.",
       );
       const count = await tx.ticket.count({
         where: { serviceDayId: d.id, status: "WAITING" },
@@ -528,5 +534,73 @@ export async function updateService(
       },
     });
     return { id };
+  });
+}
+
+export async function officeCommand(
+  serviceId: string,
+  userId: string,
+  action: "pause" | "resume",
+  reason?: string,
+  now = new Date(),
+) {
+  return locked(serviceId, async (tx, s) => {
+    assert(
+      s.serviceType === "OFFICE",
+      409,
+      "NOT_AN_OFFICE_QUEUE",
+      "Office pause controls are only available for office walk-in lines.",
+    );
+    await rollover(tx, s, now);
+    if (action === "pause") {
+      assert(
+        s.state === "OPEN",
+        409,
+        "INVALID_SERVICE_TRANSITION",
+        "This office line is already paused or closed.",
+      );
+      const visibleReason =
+        reason?.trim() || "In a meeting; new joins and calls are paused.";
+      assert(
+        visibleReason.length >= 3 && visibleReason.length <= 160,
+        422,
+        "INVALID_REASON",
+        "Use a public-safe reason between 3 and 160 characters.",
+      );
+      await tx.service.update({
+        where: { id: s.id },
+        data: { state: "PAUSED", pauseReason: visibleReason },
+      });
+      await tx.serviceEvent.create({
+        data: {
+          serviceId: s.id,
+          eventType: "OFFICE_MEETING_PAUSED",
+          actorUserId: userId,
+          metadata: { reason: visibleReason },
+          createdAt: now,
+        },
+      });
+      return { serviceId: s.id, state: "PAUSED" };
+    }
+    assert(
+      s.state === "PAUSED",
+      409,
+      "INVALID_SERVICE_TRANSITION",
+      "This office line is not paused.",
+    );
+    await tx.service.update({
+      where: { id: s.id },
+      data: { state: "OPEN", pauseReason: null },
+    });
+    await tx.serviceEvent.create({
+      data: {
+        serviceId: s.id,
+        eventType: "OFFICE_MEETING_RESUMED",
+        actorUserId: userId,
+        metadata: { previousReason: s.pauseReason ?? "" },
+        createdAt: now,
+      },
+    });
+    return { serviceId: s.id, state: "OPEN" };
   });
 }

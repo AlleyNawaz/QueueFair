@@ -37,6 +37,8 @@ jobs:
         run: |
           echo "DEMO_STAFF_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
           echo "DEMO_ADMIN_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+          echo "DEMO_HOSTEL_OFFICER_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+          echo "DEMO_SPORTS_OFFICER_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
           touch .env.test
       - run: pnpm db:generate
       - run: pnpm db:migrate:test
@@ -45,6 +47,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm test:integration
+      - run: pnpm test:load
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
       - name: Build without generated Prisma files or database credentials

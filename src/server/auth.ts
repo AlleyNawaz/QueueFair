@@ -72,6 +72,56 @@ export async function allowedCounter(user: User, counterId: string) {
   }
   return counter;
 }
+export async function allowedService(user: User, serviceId: string) {
+  const service = await db.service.findUnique({ where: { id: serviceId } });
+  assert(service, 404, "NOT_FOUND", "Service not found.");
+  if (user.role !== "ADMIN")
+    assert(
+      await canManageService(user.id, serviceId),
+      403,
+      "FORBIDDEN",
+      "This office is not assigned to you.",
+    );
+  return service;
+}
+export async function canManageService(userId: string, serviceId: string) {
+  return !!(await db.staffAssignment.findFirst({
+    where: { userId, serviceId },
+    select: { id: true },
+  }));
+}
+export async function visibleServiceScopes(user: User) {
+  if (user.role === "ADMIN") {
+    const services = await db.service.findMany({ select: { id: true } });
+    return services.map(({ id }) => ({
+      serviceId: id,
+      visible: true,
+      inherited: false,
+      wholeService: true,
+      counterIds: [] as string[],
+    }));
+  }
+  const assignments = await db.staffAssignment.findMany({
+    where: { userId: user.id },
+    select: { serviceId: true, counterId: true },
+  });
+  return [
+    ...new Set(assignments.map((assignment) => assignment.serviceId)),
+  ].map((serviceId) => {
+    const direct = assignments.filter(
+      (assignment) => assignment.serviceId === serviceId,
+    );
+    return {
+      serviceId,
+      visible: true,
+      inherited: false,
+      wholeService: direct.some((assignment) => assignment.counterId === null),
+      counterIds: direct.flatMap((assignment) =>
+        assignment.counterId ? [assignment.counterId] : [],
+      ),
+    };
+  });
+}
 export async function login(email: string, password: string) {
   const user = await db.user.findUnique({
     where: { email: email.toLowerCase() },

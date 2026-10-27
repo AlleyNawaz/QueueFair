@@ -176,7 +176,7 @@ export function EstimatePanel({ estimate: e }: { estimate: Estimate }) {
           <dd>{e.ahead}</dd>
         </div>
         <div>
-          <dt>Active counters</dt>
+          <dt>Counters set active</dt>
           <dd>{e.activeCounters}</dd>
         </div>
         <div>
@@ -189,9 +189,10 @@ export function EstimatePanel({ estimate: e }: { estimate: Estimate }) {
         </div>
       </dl>
       <small>
-        Outlier rule: only 30 seconds–2 hours, up to 30 visits. Fewer than five
-        samples uses the configured baseline. The range is heuristic, not a
-        confidence interval.
+        Active is a configured counter state; it does not confirm an operator is
+        present. Outlier rule: only 30 seconds–2 hours, up to 30 visits. Fewer
+        than five samples uses the configured baseline. The range is heuristic,
+        not a confidence interval.
       </small>
     </details>
   );

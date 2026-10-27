@@ -11,6 +11,21 @@
 - Demo reset is an explicit guarded CLI command only. An unused ENABLE_DEMO_RESET example flag does not activate an HTTP reset handler. Synthetic seeded owners do not expose capabilities; self-service demos create fresh owned tickets.
 - Urdu dictionaries and RTL cover key student/display labels; long explanations and staff/admin remain English. Push notifications, CSV and elaborate charts are omitted. No Kiro usage or recorded video is claimed.
 
+## Directory and demo clarity — 2026-10-27
+
+- The home screen gives first priority to choosing a service and its queue/join action. It removes the large decorative hero and illustration card so all service actions fit in the first desktop viewport.
+- A zero count reads “No one waiting”; “You may be called next” remains reserved for the estimator’s immediate-call case. Baseline estimates are identified as configured baselines, and recent averages include their sample count.
+- `Counter.state = ACTIVE` means the counter is configured as call-capable. It is not evidence of staff login, presence, or a current visit. Student and admin summaries say “set active”; idle public display cards say “CONFIGURED ACTIVE.”
+- The synthetic local Finance fixtures start idle and empty so a new student can be called first under FIFO. Other services carry the called, serving, missed, and waiting examples. Explicit guarded local reset refreshes the day; the hosted catalog is not seeded or changed by this work.
+- The visual direction is an ink-and-paper campus wayfinding board: compact numbered desk labels, tabular queue counts, indigo action color, quiet service-state badges, and clear queue text. No other product’s layout, logo, illustration, or palette is copied.
+- No AWS service is integrated or claimed; the queue remains PostgreSQL-backed.
+
+## Office walk-in queue and retired scheduler code — 2026-10-27
+
+- Office audiences use the existing same-day FIFO service queue, with direct staff assignments, audited pause/resume, bounded optional notes, and the configured call/arrival grace. Joining is not an appointment or guaranteed meeting.
+- Appointment runtime routes, UI, and API behavior have been retired. Historical migrations and dormant Prisma models remain because the corresponding migration was already applied locally and migration history must remain immutable; no current app route or queue command reads or writes those models. A future cleanup can remove them only through a deliberate forward migration after verifying every target database.
+- The office operator pause notice is public-safe. Optional student note and reason are returned only in owner/private-ticket and assigned-staff DTOs. Public directory/display DTOs remain allowlisted.
+
 ## Installed versions and official sources
 
 Registry resolution was checked, mutually compatible stable releases selected, and the lockfile retained. Prisma's registry latest was an 8.0 release candidate; stable **7.10.1** was chosen consistently for CLI, client and adapter. Initial ESLint 10 / TypeScript 7 peer mismatches were corrected to ESLint 9.39.2 / TypeScript 5.9.3 supported by the installed Next lint plugins; `pnpm peers check` reports no peer issues. ESLint 9 is an older compatibility dependency; reassess when those plugins support ESLint 10.
@@ -32,3 +47,7 @@ Registry resolution was checked, mutually compatible stable releases selected, a
 | Playwright                       | 1.64.1        | [Introduction](https://playwright.dev/docs/intro)                                                                                                                                                                                                                                                 |
 
 Next’s installed docs confirm route handlers are not cached by default and cookies/params are asynchronous. The API additionally sets force-dynamic and no-store. Prisma uses the Prisma 7 output directory generator, config-file URL, and PostgreSQL driver adapter; it does not mix Prisma 6 datasource URL configuration. Node 26.12 was the available runtime; README recommends Node 24 LTS. CI uses Node 24. The native dependencies explicitly allowed to run installation scripts are listed in pnpm-workspace.yaml.
+
+# Office service decision — same-day walk-in line
+
+Office queues are a `Service` subtype selected by `serviceType=OFFICE`, not a new scheduler. This keeps offices on the existing PostgreSQL FIFO, ownership, idempotency, pause and counter-assignment paths. Joining creates a same-day walk-in ticket and never promises a meeting slot. Office operators pause new joins/calls with a public-safe meeting notice; they preserve the line and finish active calls. Optional notes are explicitly service-configurable, capped at 240 characters, and available only to the owner and assigned office staff. Demo officers receive counter-scoped assignments; no general staff role receives office access implicitly.

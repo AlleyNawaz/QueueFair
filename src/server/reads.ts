@@ -3,6 +3,7 @@ import { estimateWait, localDate, type Hours } from "@/lib/policy";
 import { openNow } from "./queue";
 import { assert } from "./errors";
 import type { User } from "@/generated/prisma/client";
+import { visibleServiceScopes } from "./auth";
 export async function publicState(serviceId: string, now = new Date()) {
   const s = await db.service.findUnique({
     where: { id: serviceId },
@@ -66,6 +67,8 @@ export async function publicState(serviceId: string, now = new Date()) {
     dto: {
       id: s.id,
       slug: s.slug,
+      serviceType: s.serviceType,
+      allowNote: s.allowNote,
       name: s.name,
       description: s.description,
       prefix: s.prefix,
@@ -78,6 +81,7 @@ export async function publicState(serviceId: string, now = new Date()) {
       documentRequirements: s.documentRequirements,
       visitReasonOptions: s.visitReasonOptions,
       gracePeriodSeconds: s.gracePeriodSeconds,
+      maxWaitingTickets: s.maxWaitingTickets,
       joiningOpen: openNow(s, now),
       waitingCount: waiting.length,
       estimate: estimate(waiting.length),
@@ -126,6 +130,8 @@ export async function privateTicket(publicId: string, ownerId: string) {
     publicId: t.publicId,
     tokenLabel: t.tokenLabel,
     status: t.status,
+    visitReasonCode: t.visitReasonCode,
+    note: t.note,
     localDate: t.serviceDay.localDate,
     joinedAt: t.joinedAt.toISOString(),
     calledAt: t.calledAt?.toISOString() ?? null,
@@ -158,14 +164,12 @@ export async function myTickets(ownerId: string) {
   return Promise.all(list.map((t) => privateTicket(t.publicId, ownerId)));
 }
 export async function staffOverview(user: User) {
-  const assignments =
-    user.role === "ADMIN"
-      ? null
-      : await db.staffAssignment.findMany({ where: { userId: user.id } });
+  const scopes = await visibleServiceScopes(user);
+  const scopeByService = new Map(
+    scopes.map((scope) => [scope.serviceId, scope]),
+  );
   const list = await db.service.findMany({
-    where: assignments
-      ? { id: { in: assignments.map((a) => a.serviceId) } }
-      : {},
+    where: { id: { in: scopes.map((scope) => scope.serviceId) } },
     orderBy: { name: "asc" },
   });
   const items = await Promise.all(
@@ -184,6 +188,8 @@ export async function staffOverview(user: User) {
           id: true,
           tokenLabel: true,
           status: true,
+          visitReasonCode: true,
+          note: true,
           assignedCounterId: true,
           queueEnteredAt: true,
           calledAt: true,
@@ -194,24 +200,34 @@ export async function staffOverview(user: User) {
       return {
         ...state,
         counters: state.counters
-          .filter(
-            (c) =>
-              !assignments ||
-              assignments.some(
-                (a) =>
-                  a.serviceId === s.id &&
-                  (!a.counterId || a.counterId === c.id),
-              ),
-          )
-          .map((c) => ({
-            ...c,
-            work:
-              all.find(
-                (t) =>
-                  t.assignedCounterId === c.id &&
-                  ["CALLED", "SERVING"].includes(t.status),
-              ) ?? null,
-          })),
+          .filter((c) => {
+            const scope = scopeByService.get(s.id);
+            return (
+              scope?.wholeService || scope?.counterIds.includes(c.id) || false
+            );
+          })
+          .map((c) => {
+            const work = all.find(
+              (t) =>
+                t.assignedCounterId === c.id &&
+                ["CALLED", "SERVING"].includes(t.status),
+            );
+            const assignedStaff =
+              user.role === "STAFF" &&
+              scopeByService.get(s.id)?.visible === true;
+            return {
+              ...c,
+              work: work
+                ? {
+                    ...work,
+                    visitReasonCode: assignedStaff
+                      ? work.visitReasonCode
+                      : null,
+                    note: assignedStaff ? work.note : null,
+                  }
+                : null,
+            };
+          }),
         waiting: all
           .filter((t) => t.status === "WAITING")
           .map((t) => ({
@@ -219,6 +235,16 @@ export async function staffOverview(user: User) {
             tokenLabel: t.tokenLabel,
             rejoinCount: t.rejoinCount,
             queueEnteredAt: t.queueEnteredAt,
+            visitReasonCode:
+              user.role === "STAFF" &&
+              scopeByService.get(s.id)?.visible === true
+                ? t.visitReasonCode
+                : null,
+            note:
+              user.role === "STAFF" &&
+              scopeByService.get(s.id)?.visible === true
+                ? t.note
+                : null,
           })),
       };
     }),

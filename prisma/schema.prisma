@@ -30,9 +30,20 @@ model AnonymousSession {
  createdAt DateTime @default(now())
  tickets Ticket[]
  participations ActiveParticipation[]
+ meetingRequests OfficeMeetingRequest[]
 }
 model Service {
  id String @id @default(uuid())
+ serviceType String @default("DESK")
+ allowNote Boolean @default(true)
+ parentServiceId String?
+ parentService Service? @relation("ServiceHierarchy", fields:[parentServiceId], references:[id], onDelete:SetNull)
+ childServices Service[] @relation("ServiceHierarchy")
+ positionTitle String?
+ officeSourceUrl String?
+ meetingRequestsEnabled Boolean @default(false)
+ meetingDurationMinutes Int @default(20)
+ meetingRequestReasonOptions String[] @default([])
  slug String @unique
  name String
  description String
@@ -54,6 +65,8 @@ model Service {
  days ServiceDay[]
  assignments StaffAssignment[]
  events ServiceEvent[]
+ meetingRequests OfficeMeetingRequest[]
+ @@index([parentServiceId])
 }
 model Counter {
  id String @id @default(uuid())
@@ -75,6 +88,7 @@ model StaffAssignment {
  service Service @relation(fields:[serviceId],references:[id])
  counterId String?
  counter Counter? @relation(fields:[counterId],references:[id])
+ canManageDescendants Boolean @default(false)
  @@index([userId,serviceId])
 }
 model ServiceDay {
@@ -146,6 +160,40 @@ model ServiceEvent {
  createdAt DateTime @default(now())
  metadata Json @default("{}")
  @@index([serviceId,createdAt])
+}
+model OfficeMeetingRequest {
+ id String @id @default(uuid())
+ publicId String @unique @default(uuid())
+ serviceId String
+ service Service @relation(fields:[serviceId],references:[id])
+ anonymousSessionId String
+ anonymousSession AnonymousSession @relation(fields:[anonymousSessionId],references:[id])
+ status String @default("REQUESTED")
+ reasonCode String
+ note String?
+ durationMinutes Int @default(20)
+ preferredAt DateTime?
+ scheduledAt DateTime?
+ proposedAt DateTime?
+ decisionReason String?
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ events OfficeMeetingEvent[]
+ @@index([serviceId,status,createdAt])
+ @@index([anonymousSessionId,createdAt])
+ @@index([serviceId,scheduledAt])
+}
+model OfficeMeetingEvent {
+ id String @id @default(uuid())
+ requestId String
+ request OfficeMeetingRequest @relation(fields:[requestId],references:[id],onDelete:Cascade)
+ eventType String
+ actorKind String
+ actorUserId String?
+ createdAt DateTime @default(now())
+ metadata Json @default("{}")
+ @@index([requestId,createdAt])
+ @@index([eventType,createdAt])
 }
 model ActiveParticipation {
  id String @id @default(uuid())

@@ -17,7 +17,7 @@ pnpm install --frozen-lockfile
 pnpm demo:env  # creates .env with fresh random secrets; refuses to overwrite
 ```
 
-Alternatively copy `.env.example` manually. If doing so, replace the database password in **both** `POSTGRES_PASSWORD` and the URL (URL-encode special characters). Generate separate random values with `openssl rand -hex 24` for `SESSION_SECRET`, `DEMO_STAFF_PASSWORD`, and `DEMO_ADMIN_PASSWORD`. Passwords need at least 12 characters. Keep actual credentials in ignored environment files. `SESSION_SECRET` needs at least 32 characters.
+Alternatively copy `.env.example` manually. If doing so, replace the database password in **both** `POSTGRES_PASSWORD` and the URL (URL-encode special characters). Generate separate random values with `openssl rand -hex 24` for `SESSION_SECRET`, `DEMO_STAFF_PASSWORD`, `DEMO_ADMIN_PASSWORD`, `DEMO_HOSTEL_OFFICER_PASSWORD`, and `DEMO_SPORTS_OFFICER_PASSWORD`. Passwords need at least 12 characters. Keep actual credentials in ignored environment files. `SESSION_SECRET` needs at least 32 characters.
 
 ```sh
 docker compose up -d --wait
@@ -45,39 +45,44 @@ Follow the [Vercel setup guide](docs/VERCEL.md) for hosted PostgreSQL, environme
 
 ## Demo accounts and routes
 
-| Purpose                  | Route / account                                             |
-| ------------------------ | ----------------------------------------------------------- |
-| Student services         | `/`, `/services/finance-desk`                               |
-| Private ticket / history | `/tickets/[publicId]`, `/my-tickets`                        |
-| Student instructions     | `/how-it-works`                                             |
-| Staff                    | `/login` → `/staff`, `/staff/counters/[counterId]`          |
-| Staff email              | `staff@queuefair.demo`, password from `DEMO_STAFF_PASSWORD` |
-| Administrator            | `/admin`, `/admin/services`, `/admin/analytics`             |
-| Admin email              | `admin@queuefair.demo`, password from `DEMO_ADMIN_PASSWORD` |
-| Public display           | `/display/finance-desk`                                     |
-| Walkthrough              | `/demo`, [demo guide](docs/DEMO.md)                         |
+| Purpose                     | Route / account                                                               |
+| --------------------------- | ----------------------------------------------------------------------------- |
+| Student services            | `/`, `/services/finance-desk`                                                 |
+| Private ticket / history    | `/tickets/[publicId]`, `/my-tickets`                                          |
+| Student instructions        | `/how-it-works`                                                               |
+| Staff                       | `/login` → `/staff`, `/staff/counters/[counterId]`                            |
+| Staff email                 | `staff@queuefair.demo`, password from `DEMO_STAFF_PASSWORD`                   |
+| Assigned hostel officer     | `hostel.officer@queuefair.demo`, password from `DEMO_HOSTEL_OFFICER_PASSWORD` |
+| Assigned activities officer | `sports.officer@queuefair.demo`, password from `DEMO_SPORTS_OFFICER_PASSWORD` |
+| Administrator               | `/admin`, `/admin/services`, `/admin/analytics`                               |
+| Admin email                 | `admin@queuefair.demo`, password from `DEMO_ADMIN_PASSWORD`                   |
+| Public display              | `/display/finance-desk`                                                       |
+| Office walk-in lines        | `/services/cedar-hostel-office`, `/services/campus-activities-office`         |
+| Assigned officer workspace  | `/staff` · only explicitly assigned offices/counters                          |
+| Walkthrough                 | `/demo`, [demo guide](docs/DEMO.md)                                           |
 
-Use separate browser profiles/incognito windows for student and staff in a demo. The seed includes Student Affairs (two counters, six-minute baseline), Finance Desk (two counters, eight-minute baseline), and IT Help Desk (one counter, ten-minute baseline), with synthetic completed history, waiting, called, serving and eligible missed states. Seeded owners are synthetic and inaccessible to viewers; demonstrate self-service missed/rejoin with a ticket created in your browser. Defaults use 24-hour demo hours except the final minute and a clearly labeled 10-second grace. Configure realistic hours and 120-second grace for normal use.
+Use separate browser profiles/incognito windows for a demo. The seed includes three fictional service desks and two fictional same-day office walk-in lines. Cedar Hostel Office starts paused for a meeting with one synthetic waiting ticket; the line keeps its FIFO order when the assigned officer resumes it. Campus Activities Office is assigned to its own officer account. These are walk-in queues, not appointment requests, guaranteed meeting times, or private correspondence. Join anonymously with a broad visit reason; optional notes are limited to 240 characters and visible only to the owner and assigned staff. Finance starts empty so the live demo can join and call a new ticket. Other desk history is synthetic. The campus and offices are fictional and do not imply institutional endorsement.
 
 ## Scripts
 
-| Script                              | Purpose                                          |
-| ----------------------------------- | ------------------------------------------------ |
-| `pnpm dev`                          | Development server, localhost:3000               |
-| `pnpm build` / `pnpm start`         | Production build / server                        |
-| `pnpm lint` / `pnpm typecheck`      | ESLint / strict TypeScript                       |
-| `pnpm format:check` / `pnpm format` | Prettier check / format                          |
-| `pnpm test`                         | Pure deterministic domain tests                  |
-| `pnpm test:integration`             | Guarded PostgreSQL/concurrency tests             |
-| `pnpm test:e2e`                     | Playwright on port 3100 and a separate database  |
-| `pnpm demo:env`                     | Generate a new ignored .env with fresh secrets   |
-| `pnpm db:generate`                  | Generate Prisma 7 client                         |
-| `pnpm db:migrate`                   | Deploy committed migrations                      |
-| `pnpm db:migrate:test`              | Migrate the test database                        |
-| `pnpm db:catalog`                   | Add starter services to an empty catalog         |
-| `pnpm db:seed`                      | Seed an empty demo database or untouched catalog |
-| `pnpm db:rollover`                  | Explicit idempotent old-day expiration           |
-| `pnpm demo:reset --confirm`         | Destructive demo-only reseed                     |
+| Script                              | Purpose                                           |
+| ----------------------------------- | ------------------------------------------------- |
+| `pnpm dev`                          | Development server, localhost:3000                |
+| `pnpm build` / `pnpm start`         | Production build / server                         |
+| `pnpm lint` / `pnpm typecheck`      | ESLint / strict TypeScript                        |
+| `pnpm format:check` / `pnpm format` | Prettier check / format                           |
+| `pnpm test`                         | Pure deterministic domain tests                   |
+| `pnpm test:integration`             | Guarded PostgreSQL/concurrency tests              |
+| `pnpm test:e2e`                     | Playwright on port 3100 and a separate database   |
+| `pnpm test:load`                    | Guarded 40-join/50-poll office workload benchmark |
+| `pnpm demo:env`                     | Generate a new ignored .env with fresh secrets    |
+| `pnpm db:generate`                  | Generate Prisma 7 client                          |
+| `pnpm db:migrate`                   | Deploy committed migrations                       |
+| `pnpm db:migrate:test`              | Migrate the test database                         |
+| `pnpm db:catalog`                   | Add starter services to an empty catalog          |
+| `pnpm db:seed`                      | Seed an empty demo database or untouched catalog  |
+| `pnpm db:rollover`                  | Explicit idempotent old-day expiration            |
+| `pnpm demo:reset --confirm`         | Destructive demo-only reseed                      |
 
 Reset refuses production, requires `DEMO_MODE=true`, `--confirm`, and a database name ending `_demo`. No browser reset endpoint is provided, even if `ENABLE_DEMO_RESET` is set. Schedule `db:rollover` daily in the campus timezone if operating continuously. Queue mutations also run rollover inside their transaction. GET requests never change queue state.
 
@@ -98,6 +103,8 @@ pnpm build
 ```
 
 Integration and browser tests truncate only the guarded test database. Run those two suites sequentially; they share test fixtures. [Verification record](docs/VERIFICATION.md) records actual outcomes, not assumed results.
+
+The office burst test is isolated to the loopback `_test` database and truncates its own fixtures. Adjust its join burst with `QUEUEFAIR_LOAD_JOINS=100 pnpm test:load`. See [load assumptions and measured results](docs/LOAD.md); this small local run is not evidence for 15,000 simultaneous users.
 
 ## Engineering and limitations
 

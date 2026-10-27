@@ -1,19 +1,30 @@
 import { z } from "zod";
+
 export const joinSchema = z
   .object({
     reason: z.string().min(1).max(80),
-    note: z.string().max(240).optional(),
+    note: z.string().trim().max(240).optional(),
   })
   .strict();
+
 export const loginSchema = z
-  .object({ email: z.email().max(200), password: z.string().min(1).max(200) })
+  .object({
+    email: z.email().max(200),
+    password: z.string().min(1).max(200),
+  })
   .strict();
+
 export const reasonSchema = z
-  .object({ reason: z.string().trim().min(3).max(160) })
+  .object({
+    reason: z.string().trim().min(3).max(160),
+  })
   .strict();
+
 const time = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
 export const serviceSchema = z
   .object({
+    serviceType: z.enum(["DESK", "OFFICE"]),
+    allowNote: z.boolean(),
     name: z.string().trim().min(3).max(80),
     slug: z
       .string()
@@ -31,7 +42,10 @@ export const serviceSchema = z
         open: time,
         close: time,
       })
-      .refine((h) => h.close > h.open, "Closing time must follow opening time"),
+      .refine(
+        (hours) => hours.close > hours.open,
+        "Closing time must follow opening time",
+      ),
     defaultServiceSeconds: z.number().int().min(30).max(7200),
     gracePeriodSeconds: z.number().int().min(10).max(600),
     maxWaitingTickets: z.number().int().min(1).max(1000),
@@ -40,9 +54,15 @@ export const serviceSchema = z
   })
   .strict()
   .refine(
-    (s) => s.state === "OPEN" || !!s.pauseReason?.trim(),
+    (service) => service.state === "OPEN" || !!service.pauseReason?.trim(),
     "A visible reason is required when paused or closed",
+  )
+  .refine(
+    (service) =>
+      service.gracePeriodSeconds >= 30 || service.serviceType === "DESK",
+    "Office arrival grace must be at least 30 seconds",
   );
+
 export const counterSchema = z
   .object({
     serviceId: z.string().min(1),

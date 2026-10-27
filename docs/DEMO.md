@@ -2,13 +2,21 @@
 
 All campus names and stored example history are fictional/synthetic. This is near-real-time polling, not offline ticketing. Keep a student browser and a separate incognito/profile staff browser open at the same canonical origin.
 
+The seed now includes three fictional campus desks and two fictional same-day office walk-in queues. Login passwords come from ignored `.env` variables and are not committed or printed by the seed.
+
+- `hostel.officer@queuefair.demo` uses `DEMO_HOSTEL_OFFICER_PASSWORD` and is assigned only to Cedar Hostel Office.
+- `sports.officer@queuefair.demo` uses `DEMO_SPORTS_OFFICER_PASSWORD` and is assigned only to Campus Activities Office.
+
+Cedar Hostel Office starts paused with the public notice “In a meeting; existing queue order is preserved.” Resume it as the assigned officer to accept walk-ins. Its 30-second demo arrival window is intentionally short; use a service-specific grace such as 300 seconds for normal office operation. This is a FIFO walk-in queue, not a scheduled meeting or promised time.
+
 ## Prepare
 
 1. Follow README setup. Set unique demo passwords locally; read them from ignored `.env`. Staff: `staff@queuefair.demo`; administrator: `admin@queuefair.demo`.
 2. For a clean repeatable demo, explicitly run `pnpm demo:reset --confirm` against your `_demo` database with `DEMO_MODE=true`. This deletes demo data and reseeds; it never runs at startup. Do not run this against any other database. Browser reset is not available.
-3. Open `/services/finance-desk` as the student. Sign in at `/login` as staff in the other context. Open Finance Counter 2. Resolve the seeded called visit by Start → Complete. Resolve the serving visit at Counter 1 similarly, or leave it serving to demonstrate occupancy in the estimate.
-4. To get your newly joined ticket called without waiting behind seeded tickets, process the four Finance waiting fixtures first using Call → Start → Complete. FIFO has no bypass. Alternatively create a fresh service and counter with the admin UI for a clear queue, then assign staff; no test fixture bypass controls are exposed in the product.
-5. Keep the public display at `/display/finance-desk` ready. Seeded demo grace is 10 seconds, visibly labeled; normal grace is 120 seconds. The seed’s missed ticket is a synthetic owner; create a student-owned ticket to show rejoin.
+3. Open `/services/finance-desk` in the student browser and join. The Finance seed intentionally has no active work or waiting tickets, so this student becomes the first ticket and can be called immediately under FIFO.
+4. In a separate browser profile, sign in at `/login` and open the assigned Finance Counter 1 workspace. Call the ticket, then show the student’s live update. Start and complete the visit; the call and completion update the same persisted ticket.
+5. Keep `/display/finance-desk` ready in a third tab. Other services contain the seeded waiting, called and serving examples. Seeded demo grace is 10 seconds, visibly labeled; normal grace is 120 seconds. To show missed/rejoin, create a second student-owned Finance ticket, call it, wait the short grace, explicitly mark it missed, and rejoin from that same student browser.
+6. For the office story, open `/services/cedar-hostel-office` as a student and `/login` in a separate profile as `hostel.officer@queuefair.demo`. The office starts paused with one synthetic waiting ticket. Resume the same-day walk-in line; the existing ticket remains first. Have the student join with a broad reason and optional non-sensitive note, open the officer workspace, call the next eligible ticket, then start and complete it. The private ticket tells the student when to go and shows the configured short arrival window. The public office display shows token/counter state only. This is not appointment scheduling or a guaranteed meeting time.
 
 ## Narration and actions
 
@@ -21,6 +29,10 @@ All campus names and stored example history are fictional/synthetic. This is nea
 | 1:50–2:15 | Join again, call, wait the 10-second demo grace, explicitly mark missed. Rejoin from the owning browser; token stays the same and queue sequence moves to the tail. A second missed turn has no rejoin. |
 | 2:15–2:35 | Sign in as admin, set Finance to PAUSED with reason “Counter team briefing.” Show student/display notice, blocked joins and unavailable estimates. Restore OPEN afterward.                              |
 | 2:35–3:00 | Show architecture, tests and verification record. Explain device-owned tickets, heuristic estimates, polling and fictional seed data.                                                                   |
+
+The local fixture set is deliberately small: Finance has five completed samples and one inaccessible synthetic missed ticket, but starts with an empty active queue for the live student flow. Student Affairs and IT contain synthetic active work, missed tickets, and waiting tickets so the directory and wall displays have realistic states. All are synthetic, not attendance or impact data.
+
+Counters labeled **set active** reflect their saved configuration state only. They do not indicate an operator is signed in or physically present. No AWS integration is used or claimed.
 
 ## Fallback and recording
 

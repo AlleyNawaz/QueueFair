@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run tests/unit",
     "test:integration": "node --env-file=.env.test node_modules/vitest/vitest.mjs run tests/integration --maxWorkers=1",
+    "test:load": "node --env-file=.env.test node_modules/vitest/vitest.mjs run tests/performance --maxWorkers=1 --silent=false",
     "test:e2e": "node --env-file=.env.test node_modules/@playwright/test/cli.js test",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",

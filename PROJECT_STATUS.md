@@ -1,5 +1,33 @@
 # QueueFair implementation status
 
+## Officer queue follow-up — 2026-10-27
+
+- [x] Add desk/office kind, short-note policy, fictional office services and directly assigned officer accounts.
+- [x] Add assigned-officer pause/resume with audited public-safe notice and preserved FIFO order.
+- [x] Keep reason/note private to ticket owner and assigned staff; verify public DTO redaction.
+- [x] Add office integration, browser, privacy, pause/resume and workload coverage.
+- [x] Run the full local checks and restore the guarded demo fixtures.
+
+## Hackathon readiness checklist — 2026-10-27
+
+- [x] Audit current source, git state, installed versions, local/production public data, and run baseline checks.
+- [x] Redesign the directory around the real service choices; remove misleading empty-queue/counter copy and keep actions in the first laptop viewport.
+- [x] Tighten the local seeded Finance queue and rehearse the local student-to-staff-to-display story without touching production.
+- [x] Review directory states, keyboard behavior, and responsive layouts at 375px, 768px, 1366×768, and 1440px; run affected checks and build.
+- [x] Update demo/verification documentation with only verified outcomes; preserve `docs/HACKATHON_CODEX_BRIEF.md` as the existing untracked user file.
+
+- Audit finding: both local and production public APIs currently return three OPEN services, zero current-day waiting tickets, and five counters with state `ACTIVE`. That state does not establish staff presence. Local PostgreSQL additionally has two demo users and historical synthetic tickets; production account/history counts are not available without hosted database access.
+- Baseline: Next.js 16.4.3, React 19.3.1, Prisma 7.10.1, Vitest 5.0.5, Playwright 1.64.1. Lint, typecheck, format, 67 unit, 13 integration, 10 browser tests, and `pnpm build` all passed before app-code changes.
+
+## Hackathon readiness fixes — 2026-10-27
+
+- Directory now leads with service selection, real queue counts, honest empty/paused states, source/sample labels for estimates, configured-counter wording, refresh status, and first-screen actions. At 1366×768, the first service action ends at y=636px; no page overflow at 375, 768, 1366, 1440, or 1920px wall display.
+- Service detail and wall display now identify empty queues as “No one waiting” and distinguish “Joining is open/paused/closed.” A pause reason appears in its notice without being duplicated in the empty-state sublabel. Idle wall counters say “CONFIGURED ACTIVE,” not a staffing claim.
+- Guarded local demo seed now leaves Finance idle and empty, preserving FIFO for a student-first call, with five completed estimate samples and a synthetic missed fixture. Student Affairs and IT carry synthetic waiting/called/serving/missed states. Local guarded reset passed and was repeated after the live rehearsal to restore a clean demo.
+- Live local PostgreSQL rehearsal passed: separate student/staff browser contexts joined FIN-007, called it at Counter 1, observed student and wall-display polling, started/completed service, and verified the stored ticket status COMPLETED. Local seed was restored afterward; public/hosted DB was untouched.
+- Final checks passed: lint, strict typecheck, formatting, 67 unit tests, 13 isolated PostgreSQL integration tests, 11 Playwright tests, and production build. Actual 375px/1366px screenshots updated in docs/screenshots; 768px/1440px and 1920px display viewport widths measured without horizontal overflow.
+- Hosted staff login/queue loop, remote CI, deployment, production seeding, and AWS integration were not run. Production credentials/account provisioning remain unverified and must be handled with the documented owner-supplied environment credentials before a public staff demo.
+
 - Phases A–E complete: compatible stack, real PostgreSQL persistence/migration/seed, transactional queue/auth, student/staff workflow, cancellation/missed/rejoin/rollover, public display, explainable estimates, admin settings/counters/assignments/analytics.
 - Phase F complete within focused scope: responsive UI, accessible native controls/dialog, print, QR, opt-in sound, typed Urdu dictionaries/RTL for core labels. Long-form Urdu, staff/admin translation, push and CSV remain unimplemented and documented.
 - Phase G complete: lint/typecheck/format/build pass; 60 unit, 13 PostgreSQL integration and 9 Playwright browser tests pass. Production-browser smoke passed with zero page errors. Actual screenshots inspected and committed. See docs/VERIFICATION.md for failures resolved and actual results.
@@ -63,3 +91,14 @@
 - Verified on disposable local PostgreSQL `*_test` databases: migration + catalog bootstrap, repeated bootstrap with no duplicates, then explicit full seed (3 services, 5 counters, 2 users, 45 tickets); also ran the complete Production-mode Vercel build and confirmed its database ends with only the 3 services and 5 counters. Temporary databases were removed.
 - The live Vercel deployment now returns all three services and their five counters. Verified a real same-origin anonymous bootstrap, ticket join (HTTP 200), then cancellation cleanup (HTTP 200); no active ticket was left behind. When APP_ORIGIN is unset, same-origin validation uses the request URL. When SESSION_SECRET is unset, rate-limit HMAC falls back to the private DATABASE_URL.
 - Lint, strict typecheck, format check, 67 unit tests, 13 integration tests, 10 Playwright tests, local production build, and isolated Vercel Production-mode build pass. Staff/admin accounts and synthetic walkthrough history remain absent until the explicit password-protected seed is run.
+
+## Office queue completion — 2026-10-27
+
+- [x] Deliver the same-day FIFO office walk-in flow using the existing service, counter, assignment, ticket, and transaction model. The Cedar Hostel Office fixture starts paused for a meeting; Campus Activities Office has its own direct officer assignment.
+- [x] Remove appointment-request runtime routes, UI, and API branches. Older applied migration history and dormant Prisma appointment models are retained to avoid rewriting deployed migration history; they are not exposed or used by the application.
+- [x] Verify all 12 Playwright scenarios, including assigned officer pause/resume, private office context, completion, directory truths, keyboard flow, mobile overflow, stale polling, and login/logout.
+- [x] Verify lint, strict typecheck, formatting, 67 unit tests, isolated PostgreSQL integration tests, guarded local demo reset, load test, and production build (see dated verification below).
+- [x] Keep hosted database, provisioning, remote CI, deployment, and AWS integration out of scope; no hosted staff workflow was verified.
+
+Load check is a small loopback exercise only: 40 concurrent joins and 50 multi-office directory reads. It does not substantiate a 15,000-concurrent-user claim.
+Read-only hosted check on 2026-10-27: `https://queuefair.vercel.app/api/services` returned HTTP 200 with three OPEN desk services and zero waiting tickets; it has no office services in the current catalog. This does not verify hosted staff credentials or queue transitions, and the local office changes have not been deployed.

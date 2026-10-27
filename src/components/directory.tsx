@@ -3,30 +3,27 @@ import Link from "next/link";
 import { dictionaries } from "@/lib/i18n/dictionaries";
 import {
   ArrowRight,
-  ArrowUpRight,
-  Check,
   Clock3,
-  GraduationCap,
-  RefreshCw,
-  ServerOff,
   Landmark,
   Laptop,
   MapPin,
-  Radio,
+  RefreshCw,
   Search,
+  ServerOff,
   ShieldCheck,
-  Ticket,
-  Users,
 } from "lucide-react";
 import { useState } from "react";
 import { useLocale } from "./providers";
 import { Badge, ErrorBox, Loading, Sync, useLive } from "./shared";
 import type { PublicService } from "@/server/reads";
 
+const weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
 export function Directory() {
   const q = useLive<PublicService[]>("services", 15000);
   const [search, setSearch] = useState("");
-  const { ur, t } = useLocale();
+  const { ur } = useLocale();
+
   if (!q.data)
     return (
       <main className="page">
@@ -55,14 +52,32 @@ export function Directory() {
         )}
       </main>
     );
-  const list = q.data.filter((s) =>
-    `${s.name} ${s.description}`.toLowerCase().includes(search.toLowerCase()),
-  );
-  const active = q.data.reduce(
-    (n, s) => n + s.counters.filter((c) => c.state === "ACTIVE").length,
+
+  const desks = q.data.filter((service) => service.serviceType === "DESK");
+  const list = desks
+    .filter((s) =>
+      `${s.name} ${s.description} ${s.location}`
+        .toLowerCase()
+        .includes(search.trim().toLowerCase()),
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const configuredCounters = q.data.reduce(
+    (total, service) => total + service.counters.length,
     0,
   );
-  const waiting = q.data.reduce((n, s) => n + s.waitingCount, 0);
+  const waiting = q.data.reduce(
+    (total, service) => total + service.waitingCount,
+    0,
+  );
+  const atCounters = q.data.reduce(
+    (total, service) =>
+      total + service.counters.filter((counter) => counter.current).length,
+    0,
+  );
+  const joiningServices = q.data.filter(
+    (service) => service.joiningOpen,
+  ).length;
+
   return (
     <main
       className="page directory-page"
@@ -70,240 +85,276 @@ export function Directory() {
       lang={ur ? "ur" : "en"}
     >
       <div className="directory-context">
-        <span>
-          <span className="campus-monogram">C</span>Cedar Campus{" "}
-          <span className="context-divider">/</span> Student services
-        </span>
+        <div className="campus-context">
+          <span className="campus-monogram" aria-hidden="true">
+            C
+          </span>
+          <span>Cedar Campus</span>
+          <span className="context-divider" aria-hidden="true">
+            /
+          </span>
+          <span>Student services</span>
+        </div>
         <span className="demo-label">Fictional campus · Demo data</span>
       </div>
-      <section className="directory-hero" aria-label="Campus queue overview">
-        <div className="hero-copy">
-          <span className="eyebrow">
-            <span className="status-dot" /> A BETTER WAY TO WAIT
-          </span>
+
+      <header className="directory-heading">
+        <div className="directory-intro">
+          <span className="eyebrow">CEDAR CAMPUS / STUDENT SERVICES</span>
           <h1>
-            {ur ? (
-              t.headline
-            ) : (
-              <>
-                Your time.
-                <br />
-                <span>Back in your hands.</span>
-              </>
-            )}
+            {ur
+              ? "روانہ ہونے سے پہلے قطار جانیں۔"
+              : "Know the line before you leave."}
           </h1>
-          <p>{t.intro}</p>
-          <div className="hero-footnote">
-            <ShieldCheck size={16} />
-            <span>No account. No personal details. Just your turn.</span>
-          </div>
+          <p>
+            {ur
+              ? "کاؤنٹر منتخب کریں، قطار دیکھیں، اور اپنی جگہ محفوظ کریں۔"
+              : "Choose a desk, see the live queue, and save your place."}
+          </p>
         </div>
-        <div className="campus-pulse">
-          <div className="pulse-heading">
-            <span>
-              <Radio size={16} /> Campus pulse
+        <section className="campus-now" aria-label="Live campus queue summary">
+          <div className="campus-now-heading">
+            <span className="campus-now-label">
+              <span className="pulse-mark" aria-hidden="true" />
+              CAMPUS, RIGHT NOW
             </span>
-            <span className={`pulse-live ${q.error ? "is-stale" : ""}`}>
-              <span className="status-dot" />
-              {q.error ? "STALE" : "LIVE"}
+            <span className={`campus-now-live ${q.error ? "stale" : ""}`}>
+              {q.error ? "STALE DATA" : "LIVE QUEUES"}
             </span>
           </div>
-          <div className="pulse-main">
+          <div className="campus-now-stats">
             <div>
-              <strong>{String(waiting).padStart(2, "0")}</strong>
-              <span>people in line across campus</span>
+              <strong>{waiting.toString().padStart(2, "0")}</strong>
+              <span>waiting</span>
             </div>
-            <div className="pulse-orbit" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-              <Ticket size={24} />
+            <div>
+              <strong>{atCounters.toString().padStart(2, "0")}</strong>
+              <span>at counters</span>
+            </div>
+            <div>
+              <strong>{joiningServices.toString().padStart(2, "0")}</strong>
+              <span>taking joins</span>
             </div>
           </div>
-          <div className="pulse-footer">
-            <span>
-              <i />
-              {active} active counters
-            </span>
-            <span>
-              {q.data.filter((s) => s.joiningOpen).length} services open{" "}
-              <ArrowUpRight size={14} />
-            </span>
+          <div className="campus-now-foot">
+            <span>{configuredCounters} counters configured</span>
+            <Sync error={q.error} at={q.data[0]?.syncedAt} />
           </div>
-        </div>
-      </section>
+        </section>
+      </header>
+
       <section className="directory-services" aria-labelledby="services-title">
         <div className="directory-toolbar">
           <div>
             <h2 id="services-title">
-              {t.campusServices}
-              <span className="count">{q.data.length}</span>
+              {ur ? "اپنی سروس منتخب کریں" : "Choose a service"}
+              <span className="count">{desks.length}</span>
             </h2>
-            <p>A clear queue. A little more room in your day.</p>
-          </div>
-          <label className="search">
-            <Search size={19} />
-            <span className="sr-only">Search services</span>
-            <input
-              placeholder="Find your service…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <kbd aria-hidden="true">⌕</kbd>
-          </label>
-        </div>
-        <div className="service-grid">
-          {list.map((s, i) => (
-            <ServiceCard key={s.id} s={s} ur={ur} index={i} />
-          ))}
-        </div>
-        {!list.length && (
-          <div className="empty">
-            <Search size={26} />
             <p>
-              {q.data.length === 0
-                ? "Campus services are being set up. Please check back shortly."
-                : "No services match your search."}
+              {ur
+                ? "قطار کی تازہ صورتحال ہر 15 سیکنڈ میں دکھائی جاتی ہے۔"
+                : "Queue state and join availability refresh every 15 seconds."}
             </p>
           </div>
+          {desks.length > 0 && (
+            <label className="search">
+              <Search size={19} aria-hidden="true" />
+              <span className="sr-only">Search campus services</span>
+              <input
+                aria-label="Search campus services"
+                placeholder="Search services or locations"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </label>
+          )}
+        </div>
+
+        {list.length > 0 ? (
+          <div className="service-grid">
+            {list.map((service, index) => (
+              <ServiceCard
+                key={service.id}
+                service={service}
+                index={index}
+                ur={ur}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="directory-empty" role="status">
+            <span className="directory-empty-mark">
+              <Search size={20} aria-hidden="true" />
+            </span>
+            <h3>
+              {desks.length === 0
+                ? "No campus services are configured yet"
+                : "No services match that search"}
+            </h3>
+            <p>
+              {desks.length === 0
+                ? "Please check back after the campus team adds its service desks."
+                : "Try a different service name or location."}
+            </p>
+            {desks.length > 0 && search && (
+              <button className="text-link" onClick={() => setSearch("")}>
+                Clear search
+              </button>
+            )}
+          </div>
         )}
+
         <div className="directory-refresh">
-          <Sync error={q.error} at={q.data[0]?.syncedAt} />
           <span>
-            <ShieldCheck size={14} /> Fair queue. Same rules for everyone.
+            <ShieldCheck size={14} aria-hidden="true" />
+            Private tickets · public display shows token numbers only
           </span>
         </div>
       </section>
-      <section className="how-strip" aria-label="How QueueFair works">
-        <div className="how-strip-heading">
-          <span className="eyebrow">FROM HERE TO YOUR TURN</span>
-          <h2>
-            Three steps.
-            <br /> Zero guesswork.
-          </h2>
-          <Link className="text-link" href="/how-it-works">
-            How it works <ArrowUpRight size={15} />
-          </Link>
-        </div>
-        <ol>
-          <li>
-            <span className="step-icon">
-              <Search size={21} />
-            </span>
-            <span className="step-number">01</span>
-            <h3>Find your desk</h3>
-            <p>Check the wait and what to bring.</p>
-          </li>
-          <li>
-            <span className="step-icon">
-              <Ticket size={21} />
-            </span>
-            <span className="step-number">02</span>
-            <h3>Save your place</h3>
-            <p>Get a private ticket in this browser.</p>
-          </li>
-          <li>
-            <span className="step-icon">
-              <Check size={21} />
-            </span>
-            <span className="step-number">03</span>
-            <h3>Make your move</h3>
-            <p>Head over when your counter calls.</p>
-          </li>
-        </ol>
-      </section>
-      <div className="browser-reminder">
-        <div>
-          <ShieldCheck size={20} />
-          <p>
-            <strong>Your ticket stays with this browser.</strong> Keep your
-            cookies to keep self-service access.
-          </p>
-        </div>
-        <Link href="/my-tickets">
-          Find my tickets <ArrowRight size={16} />
-        </Link>
-      </div>
     </main>
   );
 }
+
 function ServiceCard({
-  s,
-  ur,
+  service,
   index,
+  ur,
 }: {
-  s: PublicService;
-  ur: boolean;
+  service: PublicService;
   index: number;
+  ur: boolean;
 }) {
-  const Icon =
-    s.prefix === "FIN" ? Landmark : s.prefix === "IT" ? Laptop : GraduationCap;
-  const tone =
-    s.prefix === "FIN"
-      ? "finance"
-      : s.prefix === "IT"
-        ? "technology"
-        : "student";
+  const t = dictionaries[ur ? "ur" : "en"];
+  const icon =
+    service.prefix === "FIN"
+      ? Landmark
+      : service.prefix === "IT"
+        ? Laptop
+        : ShieldCheck;
+  const hours =
+    service.weeklyHours.days.length === 7
+      ? "Daily"
+      : service.weeklyHours.days.map((day) => weekdayNames[day]).join(" · ");
+  const badgeState = service.joiningOpen
+    ? "OPEN"
+    : service.state === "OPEN"
+      ? "CLOSED"
+      : service.state;
+  const closedMessage = service.pauseReason
+    ? service.pauseReason
+    : service.state === "OPEN"
+      ? "Outside opening hours"
+      : service.state === "PAUSED"
+        ? "Joining is paused"
+        : "This service is closed";
+  const estimateQuality =
+    service.estimate.samples >= 5
+      ? `Recent average · ${service.estimate.samples} visits`
+      : `Configured baseline · ${Math.round(service.estimate.averageSeconds / 60)} min per visit`;
+  const Icon = icon;
+
   return (
-    <article className={`service-card service-${tone}`}>
-      <div className="service-card-art">
-        <div className="art-grid" aria-hidden="true" />
-        <span className="service-index">
-          CAMPUS / {String(index + 1).padStart(2, "0")}
-        </span>
-        <span className="service-glyph" aria-hidden="true">
-          <Icon strokeWidth={1.35} />
-        </span>
-        <span className="art-prefix" aria-hidden="true">
-          {s.prefix}
-        </span>
-        <Badge
-          state={
-            s.joiningOpen ? "OPEN" : s.state === "OPEN" ? "CLOSED" : s.state
-          }
-        />
-      </div>
-      <div className="service-card-content">
-        <div className="service-title-row">
-          <h3>{s.name}</h3>
-          <ArrowUpRight size={18} aria-hidden="true" />
-        </div>
-        <p className="service-description">{s.description}</p>
-        <div className="service-location">
-          <MapPin size={14} />
-          {s.location}
-        </div>
-        <div className="card-metrics">
-          <div>
-            <span>
-              <Clock3 size={14} /> Estimated wait
-            </span>
-            <strong className="wait-value">
-              {s.estimate.available
-                ? s.estimate.seconds! < 60
-                  ? "Up next"
-                  : s.estimate.label
-                : "Unavailable"}
-            </strong>
-          </div>
-          <div>
-            <span>
-              <Users size={14} /> In line
-            </span>
-            <strong>
-              {String(s.waitingCount).padStart(2, "0")}
-              <small> people</small>
-            </strong>
-          </div>
-        </div>
-        {s.pauseReason && <p className="notice">{s.pauseReason}</p>}
-        <div className="service-card-bottom">
-          <span className="card-hours">
-            {s.weeklyHours.open}–{s.weeklyHours.close} <small>PKT</small>
+    <article className="service-card">
+      <div className="service-card-head">
+        <div className="service-wayfinding">
+          <span className="service-prefix">{service.prefix}</span>
+          <span>
+            {service.serviceType === "OFFICE" ? "OFFICE LINE" : "SERVICE DESK"}{" "}
+            / {String(index + 1).padStart(2, "0")}
           </span>
-          <Link className="button card-action" href={`/services/${s.slug}`}>
-            {dictionaries[ur ? "ur" : "en"].viewQueue}
-            <ArrowRight size={16} />
+        </div>
+        <Badge state={badgeState} />
+      </div>
+
+      <div className="service-card-body">
+        <div className="service-card-title">
+          <span className="service-icon" aria-hidden="true">
+            <Icon size={17} strokeWidth={1.8} />
+          </span>
+          <h3>{service.name}</h3>
+        </div>
+        <p className="service-purpose">{service.description}</p>
+        <div className="service-where">
+          <MapPin size={15} aria-hidden="true" />
+          <span>{service.location}</span>
+        </div>
+
+        <div className="service-queue-state">
+          <div className="queue-count">
+            <strong>{service.waitingCount}</strong>
+            <span>
+              {service.waitingCount === 1 ? "person" : "people"} waiting
+            </span>
+          </div>
+          <div className="queue-estimate">
+            {service.waitingCount === 0 ? (
+              <>
+                <strong>No one waiting</strong>
+                <span>
+                  {service.joiningOpen ? "Joining is open" : closedMessage}
+                </span>
+              </>
+            ) : service.estimate.available ? (
+              <>
+                <strong>{service.estimate.label}</strong>
+                <span>{estimateQuality}</span>
+              </>
+            ) : (
+              <>
+                <strong>Estimate unavailable</strong>
+                <span>{service.estimate.explanation}</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {service.counters.some((counter) => counter.current) && (
+          <div
+            className="service-current-calls"
+            aria-label="Current counter calls"
+          >
+            {service.counters
+              .filter((counter) => counter.current)
+              .slice(0, 2)
+              .map((counter) => (
+                <div className="service-current-call" key={counter.id}>
+                  <span className="call-token">
+                    {counter.current!.tokenLabel}
+                  </span>
+                  <span>
+                    {counter.current!.status === "CALLED"
+                      ? `Go to ${counter.name}`
+                      : `Serving at ${counter.name}`}
+                  </span>
+                </div>
+              ))}
+          </div>
+        )}
+
+        {(service.pauseReason || service.notice) && (
+          <p className="service-notice">
+            {service.pauseReason || service.notice}
+          </p>
+        )}
+
+        <div className="service-card-footer">
+          <div className="service-card-facts">
+            <span className="service-hours">
+              <Clock3 size={14} aria-hidden="true" />
+              {hours} · {service.weeklyHours.open}–{service.weeklyHours.close}{" "}
+              PKT
+            </span>
+            <span className="service-counter-config">
+              {service.counters.length} counters configured
+            </span>
+          </div>
+          <Link
+            className="button service-action"
+            href={`/services/${service.slug}`}
+            aria-label={`${t.viewQueue} for ${service.name}`}
+          >
+            {t.viewQueue}
+            <ArrowRight size={16} aria-hidden="true" />
           </Link>
         </div>
       </div>

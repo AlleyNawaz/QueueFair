@@ -26,6 +26,8 @@ type Analytics = {
   demo: boolean;
 };
 const defaultSettings: Settings = {
+  serviceType: "DESK",
+  allowNote: true,
   name: "",
   slug: "",
   description: "",
@@ -63,11 +65,12 @@ export function AdminOverview() {
           value={q.data?.reduce((n, s) => n + s.waitingCount, 0)}
         />
         <Metric
-          label="Active counters"
+          label="Counters set active"
           value={q.data?.reduce(
             (n, s) => n + s.counters.filter((c) => c.state === "ACTIVE").length,
             0,
           )}
+          detail="Configured to accept calls; not an operator presence signal."
         />
         <Metric label="Completed today (PKT)" value={stats.data?.completed} />
       </div>
@@ -91,14 +94,17 @@ export function AdminOverview() {
 function Metric({
   label,
   value,
+  detail,
 }: {
   label: string;
   value?: string | number | null;
+  detail?: string;
 }) {
   return (
     <div className="panel stat">
       <span>{label}</span>
       <strong>{value ?? "—"}</strong>
+      {detail && <small>{detail}</small>}
     </div>
   );
 }
@@ -271,6 +277,18 @@ function ServiceForm({ initial, id }: { initial: Settings; id?: string }) {
     >
       <h2>{id ? `Settings · ${initial.name}` : "Create a service"}</h2>
       <div className="form-grid">
+        <label>
+          Queue type
+          <select
+            value={form.serviceType}
+            onChange={(e) =>
+              field("serviceType", e.target.value as Settings["serviceType"])
+            }
+          >
+            <option value="DESK">Campus service desk</option>
+            <option value="OFFICE">Same-day office walk-in line</option>
+          </select>
+        </label>
         {(["name", "slug", "prefix", "location"] as const).map((k) => (
           <label key={k}>
             {k}
@@ -321,6 +339,14 @@ function ServiceForm({ initial, id }: { initial: Settings; id?: string }) {
           maxLength={300}
           onChange={(e) => field("notice", e.target.value)}
         />
+      </label>
+      <label className="inline-checkbox">
+        <input
+          type="checkbox"
+          checked={form.allowNote}
+          onChange={(e) => field("allowNote", e.target.checked)}
+        />
+        Allow an optional private note (up to 240 characters)
       </label>
       <div className="form-grid">
         <label>

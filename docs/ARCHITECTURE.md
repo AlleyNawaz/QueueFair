@@ -51,3 +51,9 @@ Waiting time per attempt is captured as `waitSeconds` and attempt number on CALL
 Public state explicitly constructs counter token/status, next five tokens, counts and service configuration. It never spreads a ticket database object into a public response. Private reads filter by both public ID and capability owner. Staff overview omits visit notes and reasons. Authentication sessions and capabilities store SHA-256 hashes of 256-bit random secrets. Passwords use Argon2id.
 
 All queue API responses use `Cache-Control: no-store`, with a force-dynamic Node handler and no state-changing GETs. Polling pauses in hidden tabs, refetches on focus/reconnect, backs off retries, retains last fetched data and shows stale errors. The database remains the source of truth. No optimistic queue transitions, WebSockets, Redis, external messaging, or offline issuance.
+
+# Office walk-in queues
+
+Desk and office walk-in queues share `Service`, `Counter`, `StaffAssignment`, service-day sequences, ticket transitions, and persistence. `serviceType` controls office-specific explanations; it does not create a second queue engine. Offices are same-day, first-come-first-served lines, not appointment calendars. The service settings carry public-safe notice, note permission, waiting capacity, office hours and call/arrival grace. Office staff can pause/resume their assigned service through the audited shared transaction; pause preserves waiting order and existing active work can finish. Counter-restricted staff can see the reason and optional short note for the service they are assigned to; the public DTO never returns ticket reason or note.
+
+Office walk-in pause and resume both take the service row lock, run guarded day rollover, change the visible service state and write a `ServiceEvent` in one transaction. Rejoin uses the same ticket command and queue-sequence allocation as desk queues. See [the load check](LOAD.md) for the measured local burst and its limits.

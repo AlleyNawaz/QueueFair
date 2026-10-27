@@ -4,6 +4,7 @@ import {
   anonymous,
   requireUser,
   allowedCounter,
+  allowedService,
   login,
   logout,
   checkOrigin,
@@ -24,6 +25,7 @@ import {
   counterCommand,
   updateService,
   locked,
+  officeCommand,
 } from "@/server/queue";
 import {
   joinSchema,
@@ -94,7 +96,27 @@ async function handle(req: NextRequest, ctx: Context) {
       data = { ok: true };
     } else if (method === "GET" && p.join("/") === "staff/overview")
       data = await staffOverview(await requireUser());
-    else if (method === "POST" && p[0] === "counters") {
+    else if (
+      method === "POST" &&
+      p[0] === "staff" &&
+      p[1] === "services" &&
+      p.length === 4 &&
+      ["pause", "resume"].includes(p[3])
+    ) {
+      const user = await requireUser();
+      await allowedService(user, p[2]);
+      const body = await json();
+      const input = z
+        .object({ reason: z.string().trim().min(3).max(160).optional() })
+        .strict()
+        .parse(body);
+      data = await officeCommand(
+        p[2],
+        user.id,
+        p[3] as "pause" | "resume",
+        input.reason,
+      );
+    } else if (method === "POST" && p[0] === "counters") {
       const user = await requireUser();
       await allowedCounter(user, p[1]);
       const action = p.length === 3 ? p[2] : p[4];

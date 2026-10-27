@@ -9,6 +9,7 @@ const origin = "http://127.0.0.1:3100";
 let serviceId: string;
 let counterId: string;
 let otherCounterId: string;
+let officeId: string;
 test.beforeAll(async () => {
   if (
     !new URL(process.env.DATABASE_URL!).pathname.endsWith("_test") ||
@@ -66,8 +67,72 @@ test.beforeEach(async () => {
       data: { serviceId: s.id, name: "Counter 2", state: "ACTIVE" },
     })
   ).id;
+  const office = await db.service.create({
+    data: {
+      serviceType: "OFFICE",
+      allowNote: true,
+      name: "Hostel Administration Office",
+      slug: "hostel-office-test",
+      prefix: "HOST",
+      description: "Same-day walk-in line for residence enquiries.",
+      location: "Cedar Residence · Office 2",
+      weeklyHours: {
+        days: [0, 1, 2, 3, 4, 5, 6],
+        open: "00:00",
+        close: "23:59",
+      },
+      gracePeriodSeconds: 30,
+      documentRequirements: ["Relevant room or request reference"],
+      visitReasonOptions: ["Room access", "Maintenance follow-up"],
+    },
+  });
+  officeId = office.id;
+  await db.counter.create({
+    data: { serviceId: office.id, name: "Office", state: "ACTIVE" },
+  });
+  const officer = await db.user.create({
+    data: {
+      email: "hostel.officer@queuefair.demo",
+      displayName: "Hostel Office Officer",
+      role: "STAFF",
+      passwordHash: await hash(process.env.DEMO_HOSTEL_OFFICER_PASSWORD!),
+    },
+  });
+  await db.staffAssignment.create({
+    data: {
+      userId: officer.id,
+      serviceId: office.id,
+    },
+  });
 });
 test.afterAll(() => db.$disconnect());
+test("directory makes a zero-wait service actionable in the first viewport", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.goto("/");
+  const finance = page.getByRole("link", {
+    name: "View queue for Finance Desk",
+  });
+  await expect(finance).toBeVisible();
+  await expect(
+    page.getByText("No one waiting", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Joining is open", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(page.getByText(/Up next/i)).toHaveCount(0);
+  await expect(page.getByText("3 counters configured").first()).toBeVisible();
+  await expect(page.getByText("2 of 2 counters set active")).toHaveCount(0);
+  const bounds = await finance.boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(768);
+  await page.goto("/display/finance-desk");
+  await expect(page.getByText("No tickets waiting")).toBeVisible();
+  await expect(
+    page.getByText("No one waiting · Joining is open"),
+  ).toBeVisible();
+});
 async function joinUI(page: Page) {
   await page.goto("/services/finance-desk");
   await page.getByRole("button", { name: "Get my ticket" }).click();
@@ -75,20 +140,31 @@ async function joinUI(page: Page) {
   await expect(page.getByText("Your place is saved.")).toBeVisible();
   return page.url().split("/").at(-1)!;
 }
-async function signIn(page: Page, admin = false) {
+async function signIn(
+  page: Page,
+  role: "admin" | "staff" | "officer" = "staff",
+) {
   await page.goto("/login");
   await page
     .getByLabel("Email address")
-    .fill(admin ? "admin@queuefair.demo" : "staff@queuefair.demo");
+    .fill(
+      role === "admin"
+        ? "admin@queuefair.demo"
+        : role === "officer"
+          ? "hostel.officer@queuefair.demo"
+          : "staff@queuefair.demo",
+    );
   await page
     .getByLabel("Password", { exact: true })
     .fill(
-      admin
+      role === "admin"
         ? process.env.DEMO_ADMIN_PASSWORD!
-        : process.env.DEMO_STAFF_PASSWORD!,
+        : role === "officer"
+          ? process.env.DEMO_HOSTEL_OFFICER_PASSWORD!
+          : process.env.DEMO_STAFF_PASSWORD!,
     );
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page).toHaveURL(admin ? "/admin" : "/staff");
+  await expect(page).toHaveURL(role === "admin" ? "/admin" : "/staff");
 }
 async function post(ctx: BrowserContext, path: string, data: unknown = {}) {
   return ctx.request.post(`/api/${path}`, {
@@ -194,7 +270,7 @@ test("admin pause appears on student and display, blocks joining", async ({
   await page.goto("/services/finance-desk");
   const admin = await browser.newContext({ baseURL: origin });
   const ap = await admin.newPage();
-  await signIn(ap, true);
+  await signIn(ap, "admin");
   await ap.goto(`/admin/services/${serviceId}`);
   await ap.getByLabel("Service state").selectOption("PAUSED");
   await ap
@@ -209,6 +285,91 @@ test("admin pause appears on student and display, blocks joining", async ({
   await page.goto("/display/finance-desk");
   await expect(page.getByText(/Campus maintenance/)).toBeVisible();
   await admin.close();
+});
+test("assigned office officer pauses/resumes, sees private context, and completes walk-in", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(90_000);
+  await page.goto("/services/hostel-office-test");
+  await expect(
+    page.getByText("Same-day walk-in line · not an appointment"),
+  ).toBeVisible();
+  await page
+    .getByLabel(/anything else/i)
+    .fill("Maintenance request reference R-14");
+  await page.getByRole("button", { name: "Get my ticket" }).click();
+  await expect(page).toHaveURL(/\/tickets\//);
+  const publicId = page.url().split("/").at(-1)!;
+  await expect(
+    page.getByText("Your note: Maintenance request reference R-14"),
+  ).toBeVisible();
+  const publicState = await page
+    .context()
+    .request.get(`/api/services/${officeId}/public-state`);
+  expect(await publicState.text()).not.toContain(
+    "Maintenance request reference R-14",
+  );
+
+  const unassigned = await browser.newContext({ baseURL: origin });
+  const unauthenticatedStaffLogin = await post(unassigned, "auth/login", {
+    email: "staff@queuefair.demo",
+    password: process.env.DEMO_STAFF_PASSWORD!,
+  });
+  expect(unauthenticatedStaffLogin.ok()).toBeTruthy();
+  expect(
+    (
+      await post(unassigned, `staff/services/${officeId}/pause`, {
+        reason: "In a meeting",
+      })
+    ).status(),
+  ).toBe(403);
+  const assignedOverview = await unassigned.request.get("/api/staff/overview");
+  expect(await assignedOverview.text()).not.toContain(
+    "Hostel Administration Office",
+  );
+
+  const officer = await browser.newContext({ baseURL: origin });
+  const op = await officer.newPage();
+  await signIn(op, "officer");
+  await op
+    .getByRole("button", { name: "In a meeting — pause new joins and calls" })
+    .click();
+  await expect(op.getByText("Office line paused")).toBeVisible();
+  await expect(page.getByText(/In a meeting/)).toBeVisible();
+  await page.goto("/display/hostel-office-test");
+  await expect(page.getByText(/In a meeting/)).toBeVisible();
+  await page.goto("/services/hostel-office-test");
+  await expect(
+    page.getByRole("button", { name: "Joining currently unavailable" }),
+  ).toBeDisabled();
+  await page.goto(`/tickets/${publicId}`);
+
+  await op.getByRole("button", { name: "Resume office walk-in line" }).click();
+  await expect(op.getByText("Office line accepting walk-ins")).toBeVisible();
+  await op.getByRole("link", { name: /Open workspace/ }).click();
+  await expect(
+    op.getByText("Room access · Maintenance request reference R-14"),
+  ).toBeVisible();
+  await expect(
+    op.getByText("Maintenance request reference R-14"),
+  ).toBeVisible();
+  await op.getByRole("button", { name: "Call next ticket" }).click();
+  await expect(
+    page.getByText(
+      /Please go to Hostel Administration Office · Cedar Residence/,
+    ),
+  ).toBeVisible();
+  await expect(page.getByText(/call window is 30 seconds/)).toBeVisible();
+  await op.getByRole("button", { name: "Start service", exact: true }).click();
+  await expect(page.getByText(/You’re being helped at Office/)).toBeVisible();
+  await op.getByRole("button", { name: "Complete service" }).click();
+  await expect(page.getByText("All done. You’re good to go.")).toBeVisible();
+  expect(
+    (await db.ticket.findUniqueOrThrow({ where: { publicId } })).status,
+  ).toBe("COMPLETED");
+  await unassigned.close();
+  await officer.close();
 });
 test("private ownership, public allowlist, auth/assignment/CSRF/reset boundaries", async ({
   page,
@@ -251,6 +412,7 @@ test("private ownership, public allowlist, auth/assignment/CSRF/reset boundaries
     expect(json).not.toContain(`"${key}"`);
   await page.goto("/display/finance-desk");
   await expect(page.getByText("FIN-001")).toBeVisible();
+  await expect(page.getByText("CONFIGURED ACTIVE").first()).toBeVisible();
   await expect(page.getByText("Fee enquiry", { exact: true })).toHaveCount(0);
   await other.close();
   await staff.close();
@@ -261,7 +423,7 @@ test("mobile service and ticket have no horizontal overflow; Urdu switches direc
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Campus services" }),
+    page.getByRole("heading", { name: "Choose a service" }),
   ).toBeVisible();
   expect(
     await page.evaluate(
@@ -385,6 +547,6 @@ test("initial directory failure ends loading and retry recovers", async ({
   await page.unroute("**/api/services");
   await page.getByRole("button", { name: "Try again", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Campus services" }),
+    page.getByRole("heading", { name: "Choose a service" }),
   ).toBeVisible();
 });

@@ -11,11 +11,20 @@ export async function seed() {
   if (process.env.DEMO_MODE !== "true")
     throw new Error("Seed requires DEMO_MODE=true.");
   const staffPassword = process.env.DEMO_STAFF_PASSWORD,
-    adminPassword = process.env.DEMO_ADMIN_PASSWORD;
+    adminPassword = process.env.DEMO_ADMIN_PASSWORD,
+    hostelPassword = process.env.DEMO_HOSTEL_OFFICER_PASSWORD,
+    sportsPassword = process.env.DEMO_SPORTS_OFFICER_PASSWORD;
   if (
     !staffPassword ||
     !adminPassword ||
-    Math.min(staffPassword.length, adminPassword.length) < 12
+    !hostelPassword ||
+    !sportsPassword ||
+    Math.min(
+      staffPassword.length,
+      adminPassword.length,
+      hostelPassword.length,
+      sportsPassword.length,
+    ) < 12
   )
     throw new Error(
       "Set unique demo passwords of at least 12 characters in .env.",
@@ -25,16 +34,21 @@ export async function seed() {
       name: "Student Affairs",
       slug: "student-affairs",
       prefix: "SA",
-      description:
-        "Documents, campus records, and guidance for your student journey.",
+      description: "Documents, campus records, and student guidance.",
       location: "Student Centre · Room 104",
       duration: 360,
-      counters: 2,
       reasons: ["Document collection", "Campus records", "General enquiry"],
       docs: [
         "Relevant application or reference number",
-        "Supporting documents for your request",
+        "Supporting documents",
       ],
+      serviceType: "DESK",
+      allowNote: false,
+      state: "OPEN",
+      pauseReason: null,
+      counters: 2,
+      officerEmail: null,
+      gracePeriodSeconds: Number(process.env.DEMO_GRACE_SECONDS ?? 10),
     },
     {
       name: "Finance Desk",
@@ -42,29 +56,76 @@ export async function seed() {
       prefix: "FIN",
       description:
         "Fee enquiries, payment verification, and financial assistance.",
-      location: "Admin Block · Ground floor",
+      location: "Cedar Hall · Ground floor",
       duration: 480,
-      counters: 2,
       reasons: ["Fee enquiry", "Payment verification", "Financial assistance"],
       docs: [
         "Fee challan or payment reference, if applicable",
-        "Relevant supporting documents",
+        "Supporting documents",
       ],
+      serviceType: "DESK",
+      allowNote: false,
+      state: "OPEN",
+      pauseReason: null,
+      counters: 2,
+      officerEmail: null,
+      gracePeriodSeconds: Number(process.env.DEMO_GRACE_SECONDS ?? 10),
     },
     {
       name: "IT Help Desk",
       slug: "it-help-desk",
       prefix: "IT",
-      description:
-        "A helping hand with campus Wi-Fi, accounts, and technical issues.",
+      description: "Help with campus Wi-Fi, accounts, and technical issues.",
       location: "Library Building · Room 012",
       duration: 600,
-      counters: 1,
       reasons: ["Wi-Fi access", "Account help", "Technical issue"],
       docs: [
         "Your device, if the issue is device-specific",
-        "A description of the issue",
+        "A short issue description",
       ],
+      serviceType: "DESK",
+      allowNote: false,
+      state: "OPEN",
+      pauseReason: null,
+      counters: 1,
+      officerEmail: null,
+      gracePeriodSeconds: Number(process.env.DEMO_GRACE_SECONDS ?? 10),
+    },
+    {
+      name: "Cedar Hostel Office",
+      slug: "cedar-hostel-office",
+      prefix: "HOST",
+      description:
+        "Same-day walk-in line for residence questions and facilities.",
+      location: "Cedar Residence · Office 2",
+      duration: 420,
+      reasons: ["Room access", "Maintenance follow-up", "General enquiry"],
+      docs: ["Relevant room or request reference"],
+      serviceType: "OFFICE",
+      allowNote: true,
+      state: "PAUSED",
+      pauseReason: "In a meeting; existing queue order is preserved.",
+      counters: 1,
+      officerEmail: "hostel.officer@queuefair.demo",
+      gracePeriodSeconds: Number(process.env.DEMO_OFFICE_GRACE_SECONDS ?? 30),
+    },
+    {
+      name: "Campus Activities Office",
+      slug: "campus-activities-office",
+      prefix: "ACT",
+      description:
+        "Same-day walk-in line for sports facilities and campus activities.",
+      location: "Cedar Hall · Activities Office",
+      duration: 480,
+      reasons: ["Sports facilities", "Team registration", "Campus activity"],
+      docs: ["Any relevant team or facility reference"],
+      serviceType: "OFFICE",
+      allowNote: true,
+      state: "OPEN",
+      pauseReason: null,
+      counters: 1,
+      officerEmail: "sports.officer@queuefair.demo",
+      gracePeriodSeconds: Number(process.env.DEMO_OFFICE_GRACE_SECONDS ?? 30),
     },
   ];
   const [existingServices, existingUsers, existingTickets, existingDays] =
@@ -100,20 +161,47 @@ export async function seed() {
       passwordHash: await passwordHash(adminPassword),
     },
   });
+  const hostelOfficer = await db.user.create({
+    data: {
+      email: "hostel.officer@queuefair.demo",
+      displayName: "Hostel Office Officer",
+      role: "STAFF",
+      passwordHash: await passwordHash(hostelPassword),
+    },
+  });
+  const sportsOfficer = await db.user.create({
+    data: {
+      email: "sports.officer@queuefair.demo",
+      displayName: "Campus Activities Officer",
+      role: "STAFF",
+      passwordHash: await passwordHash(sportsPassword),
+    },
+  });
+  const officers = new Map([
+    ["hostel.officer@queuefair.demo", hostelOfficer],
+    ["sports.officer@queuefair.demo", sportsOfficer],
+  ]);
   const now = new Date();
   for (const f of fixtures) {
     const s = await db.service.upsert({
       where: { slug: f.slug },
       update: {},
       create: {
+        serviceType: f.serviceType,
+        allowNote: f.allowNote,
         name: f.name,
         slug: f.slug,
         prefix: f.prefix,
         description: f.description,
         location: f.location,
         defaultServiceSeconds: f.duration,
-        gracePeriodSeconds: Number(process.env.DEMO_GRACE_SECONDS ?? 10),
-        notice: "Demo data · shortened call grace for the walkthrough.",
+        state: f.state,
+        pauseReason: f.pauseReason,
+        gracePeriodSeconds: f.gracePeriodSeconds,
+        notice:
+          f.serviceType === "OFFICE"
+            ? "Same-day walk-in line · not an appointment. Estimates can change while the office is in a meeting."
+            : "Demo data · synthetic queue history.",
         weeklyHours: {
           days: [0, 1, 2, 3, 4, 5, 6],
           open: "00:00",
@@ -127,34 +215,78 @@ export async function seed() {
     for (let i = 1; i <= f.counters; i++)
       counters.push(
         await db.counter.upsert({
-          where: { serviceId_name: { serviceId: s.id, name: `Counter ${i}` } },
+          where: {
+            serviceId_name: {
+              serviceId: s.id,
+              name: f.serviceType === "OFFICE" ? "Office" : `Counter ${i}`,
+            },
+          },
           update: {},
-          create: { serviceId: s.id, name: `Counter ${i}`, state: "ACTIVE" },
+          create: {
+            serviceId: s.id,
+            name: f.serviceType === "OFFICE" ? "Office" : `Counter ${i}`,
+            state: "ACTIVE",
+          },
         }),
       );
-    await db.staffAssignment.create({
-      data: { userId: staff.id, serviceId: s.id },
-    });
+    if (f.officerEmail) {
+      const officer = officers.get(f.officerEmail)!;
+      await db.staffAssignment.create({
+        data: {
+          userId: officer.id,
+          serviceId: s.id,
+          counterId: null,
+        },
+      });
+    } else {
+      await db.staffAssignment.create({
+        data: {
+          userId: staff.id,
+          serviceId: s.id,
+        },
+      });
+    }
+    if (f.serviceType === "OFFICE" && f.state === "PAUSED")
+      await db.serviceEvent.create({
+        data: {
+          serviceId: s.id,
+          eventType: "OFFICE_MEETING_PAUSED",
+          actorUserId: officers.get(f.officerEmail!)!.id,
+          metadata: { reason: f.pauseReason ?? "In a meeting" },
+        },
+      });
+    const fixtureCount =
+      f.serviceType === "OFFICE"
+        ? f.state === "PAUSED"
+          ? 1
+          : 0
+        : f.slug === "finance-desk"
+          ? 6
+          : 9;
     const d = await db.serviceDay.create({
       data: {
         serviceId: s.id,
         localDate: localDate(now),
         prefix: s.prefix,
-        nextTokenSequence: 16,
-        nextQueueSequence: 16,
+        nextTokenSequence: fixtureCount + 1,
+        nextQueueSequence: fixtureCount + 1,
       },
     });
-    for (let i = 1; i <= 15; i++) {
-      const completed = i <= 8;
+    for (let i = 1; i <= fixtureCount; i++) {
+      const completed = f.serviceType !== "OFFICE" && i <= 5;
       const status = completed
         ? "COMPLETED"
-        : i === 9
-          ? "SERVING"
-          : i === 10 && counters.length > 1
-            ? "CALLED"
-            : i === 11
-              ? "MISSED"
-              : "WAITING";
+        : f.serviceType === "OFFICE"
+          ? "WAITING"
+          : f.slug === "finance-desk"
+            ? "MISSED"
+            : i === 6
+              ? "SERVING"
+              : i === 7 && counters.length > 1
+                ? "CALLED"
+                : i === 8
+                  ? "MISSED"
+                  : "WAITING";
       const owner = await db.anonymousSession.create({
         data: {
           hashedSecret: createHash("sha256")
@@ -194,7 +326,9 @@ export async function seed() {
           tokenLabel: `${s.prefix}-${String(i).padStart(3, "0")}`,
           status,
           visitReasonCode: f.reasons[0],
-          note: "Synthetic demo ticket",
+          note: f.allowNote
+            ? "Synthetic demo note; no sensitive information."
+            : null,
           joinedAt,
           queueEnteredAt: joinedAt,
           calledAt,
@@ -270,7 +404,7 @@ export async function seed() {
     }
   }
   console.log(
-    "Seeded three fictional campus services and synthetic history. Passwords were read from the environment.",
+    "Seeded fictional campus desks and same-day office queues with synthetic ticket history. Credentials were read from the environment.",
   );
 }
 if (process.argv[1]?.endsWith("seed.ts"))
