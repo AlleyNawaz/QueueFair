@@ -55,3 +55,10 @@
 - Public HTTP verification: `https://queuefair.vercel.app/` returned 200; `/api/services` returned 200 with `{ "data": [] }`. This confirms the runtime can read the migrated schema, but the production catalog is empty and the student flow is not provisioned yet.
 - The screenshot hostname `queue-fair.vercel.app` now returns Vercel `DEPLOYMENT_NOT_FOUND`. The current live project alias is `queuefair.vercel.app`.
 - Vercel CLI is logged out in this workspace, and there are no hosted credentials in the local ignored environment files. Production has not been seeded or tested for staff login/queue mutations. Follow the explicit private seed setup in `docs/VERCEL.md`; never seed from a deployment build or share secrets in chat.
+
+## Empty production catalog fix — 2026-10-27
+
+- The live directory was blank because migrations created the schema but production had no service rows. Vercel Production builds now bootstrap three fictional service definitions and five active counters only when the catalog is empty. This uses real PostgreSQL records; it does not invent tickets, history, or credentials, and it leaves an existing catalog untouched.
+- The explicit demo seed now accepts this untouched catalog and can still provision the environment-password-backed staff/admin accounts and synthetic walkthrough history.
+- Verified on disposable local PostgreSQL `*_test` databases: migration + catalog bootstrap, repeated bootstrap with no duplicates, then explicit full seed (3 services, 5 counters, 2 users, 45 tickets); also ran the complete Production-mode Vercel build and confirmed its database ends with only the 3 services and 5 counters. Temporary databases were removed.
+- Lint, strict typecheck, format check, 64 unit tests, 13 integration tests, 10 Playwright tests, and production build pass. The production change still needs the pushed Vercel deployment and live `/api/services` check.

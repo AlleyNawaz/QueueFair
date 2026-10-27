@@ -20,27 +20,6 @@ export async function seed() {
     throw new Error(
       "Set unique demo passwords of at least 12 characters in .env.",
     );
-  if (await db.service.count())
-    throw new Error(
-      "Database is not empty. Seed refuses to overwrite existing data; use guarded demo:reset explicitly.",
-    );
-  const staff = await db.user.create({
-    data: {
-      email: "staff@queuefair.demo",
-      displayName: "Campus Staff",
-      role: "STAFF",
-      passwordHash: await passwordHash(staffPassword),
-    },
-  });
-  await db.user.create({
-    data: {
-      email: "admin@queuefair.demo",
-      displayName: "Campus Administrator",
-      role: "ADMIN",
-      passwordHash: await passwordHash(adminPassword),
-    },
-  });
-  const now = new Date();
   const fixtures = [
     {
       name: "Student Affairs",
@@ -88,9 +67,45 @@ export async function seed() {
       ],
     },
   ];
+  const [existingServices, existingUsers, existingTickets, existingDays] =
+    await Promise.all([
+      db.service.findMany({ select: { slug: true } }),
+      db.user.count(),
+      db.ticket.count(),
+      db.serviceDay.count(),
+    ]);
+  if (
+    existingUsers > 0 ||
+    existingTickets > 0 ||
+    existingDays > 0 ||
+    existingServices.some((s) => !fixtures.some((f) => f.slug === s.slug))
+  )
+    throw new Error(
+      "Database contains operational data. Seed refuses to overwrite it; use guarded demo:reset only for a disposable local demo database.",
+    );
+
+  const staff = await db.user.create({
+    data: {
+      email: "staff@queuefair.demo",
+      displayName: "Campus Staff",
+      role: "STAFF",
+      passwordHash: await passwordHash(staffPassword),
+    },
+  });
+  await db.user.create({
+    data: {
+      email: "admin@queuefair.demo",
+      displayName: "Campus Administrator",
+      role: "ADMIN",
+      passwordHash: await passwordHash(adminPassword),
+    },
+  });
+  const now = new Date();
   for (const f of fixtures) {
-    const s = await db.service.create({
-      data: {
+    const s = await db.service.upsert({
+      where: { slug: f.slug },
+      update: {},
+      create: {
         name: f.name,
         slug: f.slug,
         prefix: f.prefix,
@@ -111,8 +126,10 @@ export async function seed() {
     const counters = [];
     for (let i = 1; i <= f.counters; i++)
       counters.push(
-        await db.counter.create({
-          data: { serviceId: s.id, name: `Counter ${i}`, state: "ACTIVE" },
+        await db.counter.upsert({
+          where: { serviceId_name: { serviceId: s.id, name: `Counter ${i}` } },
+          update: {},
+          create: { serviceId: s.id, name: `Counter ${i}`, state: "ACTIVE" },
         }),
       );
     await db.staffAssignment.create({

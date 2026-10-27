@@ -12,8 +12,10 @@ if (
   process.env.VERCEL_ENV === "production" &&
   process.env.DATABASE_URL?.trim()
 ) {
-  // deploy only applies committed migrations; it never resets or seeds data.
+  // Migrations are additive; catalog bootstrap only adds starter rows to an
+  // empty catalog and never resets ticket, account, or service data.
   run(["db:migrate"]);
+  run(["db:catalog"]);
 } else {
   console.log(
     "Skipping database migrations outside a configured Production deployment.",

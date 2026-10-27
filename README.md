@@ -41,7 +41,7 @@ Set the URL port to `55432` and use the password supplied to `initdb`. The curre
 
 ## Deploy to Vercel
 
-Follow the [Vercel setup guide](docs/VERCEL.md) for hosted PostgreSQL, environment variables, migrations and seeding. Vercel uses `pnpm build:vercel`: it generates Prisma, applies committed migrations to a configured Production database, and builds Next.js. Local `pnpm build` still generates Prisma and compiles without migrating. Your local database URL cannot be used from Vercel.
+Follow the [Vercel setup guide](docs/VERCEL.md) for hosted PostgreSQL, environment variables, migrations and seeding. Vercel uses `pnpm build:vercel`: it generates Prisma, applies committed migrations to a configured Production database, bootstraps the three fictional service options only when the Production catalog is empty, and builds Next.js. This starter catalog has active counters but no staff accounts or ticket history; those require the explicit protected seed command. Local `pnpm build` still generates Prisma and compiles without migrating. Your local database URL cannot be used from Vercel.
 
 ## Demo accounts and routes
 
@@ -61,22 +61,23 @@ Use separate browser profiles/incognito windows for student and staff in a demo.
 
 ## Scripts
 
-| Script                              | Purpose                                         |
-| ----------------------------------- | ----------------------------------------------- |
-| `pnpm dev`                          | Development server, localhost:3000              |
-| `pnpm build` / `pnpm start`         | Production build / server                       |
-| `pnpm lint` / `pnpm typecheck`      | ESLint / strict TypeScript                      |
-| `pnpm format:check` / `pnpm format` | Prettier check / format                         |
-| `pnpm test`                         | Pure deterministic domain tests                 |
-| `pnpm test:integration`             | Guarded PostgreSQL/concurrency tests            |
-| `pnpm test:e2e`                     | Playwright on port 3100 and a separate database |
-| `pnpm demo:env`                     | Generate a new ignored .env with fresh secrets  |
-| `pnpm db:generate`                  | Generate Prisma 7 client                        |
-| `pnpm db:migrate`                   | Deploy committed migrations                     |
-| `pnpm db:migrate:test`              | Migrate the test database                       |
-| `pnpm db:seed`                      | Seed an empty demo database                     |
-| `pnpm db:rollover`                  | Explicit idempotent old-day expiration          |
-| `pnpm demo:reset --confirm`         | Destructive demo-only reseed                    |
+| Script                              | Purpose                                          |
+| ----------------------------------- | ------------------------------------------------ |
+| `pnpm dev`                          | Development server, localhost:3000               |
+| `pnpm build` / `pnpm start`         | Production build / server                        |
+| `pnpm lint` / `pnpm typecheck`      | ESLint / strict TypeScript                       |
+| `pnpm format:check` / `pnpm format` | Prettier check / format                          |
+| `pnpm test`                         | Pure deterministic domain tests                  |
+| `pnpm test:integration`             | Guarded PostgreSQL/concurrency tests             |
+| `pnpm test:e2e`                     | Playwright on port 3100 and a separate database  |
+| `pnpm demo:env`                     | Generate a new ignored .env with fresh secrets   |
+| `pnpm db:generate`                  | Generate Prisma 7 client                         |
+| `pnpm db:migrate`                   | Deploy committed migrations                      |
+| `pnpm db:migrate:test`              | Migrate the test database                        |
+| `pnpm db:catalog`                   | Add starter services to an empty catalog         |
+| `pnpm db:seed`                      | Seed an empty demo database or untouched catalog |
+| `pnpm db:rollover`                  | Explicit idempotent old-day expiration           |
+| `pnpm demo:reset --confirm`         | Destructive demo-only reseed                     |
 
 Reset refuses production, requires `DEMO_MODE=true`, `--confirm`, and a database name ending `_demo`. No browser reset endpoint is provided, even if `ENABLE_DEMO_RESET` is set. Schedule `db:rollover` daily in the campus timezone if operating continuously. Queue mutations also run rollover inside their transaction. GET requests never change queue state.
 
